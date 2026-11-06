@@ -1,0 +1,14 @@
+/* mini game Pasangan Profesi */
+.mgg{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px;margin:8px 0}
+.mgc{position:relative;height:84px;padding:0;border:3px solid var(--ink);border-radius:14px;background:#fff;box-shadow:0 3px 0 var(--ink);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;color:var(--ink);overflow:hidden}
+.mgc .mgb,.mgc .mgf{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.mgc .mgb{font-size:32px;background:var(--sun)}
+.mgc .mgf{display:none;font:700 15px 'Baloo 2',sans-serif;background:#fff;padding:2px}
+.mgc .mgf.ar{font:700 24px 'Amiri',serif}
+.mgc .mgf i{font-style:normal;font-size:34px}.mgc .mgf small{font-size:12px}
+.mgc.up .mgb{display:none}.mgc.up .mgf{display:flex}
+.mgc.mt{border-color:var(--mint);box-shadow:0 3px 0 var(--mint)}.mgc.mt .mgf{background:#e8fbf1}
+.mgl .opt{display:inline-block;width:auto;margin:4px 4px 4px 0;font-size:18px}
+@media (max-height:420px){.mgg{grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px}.mgc{height:66px}.mgc .mgb{font-size:26px}.mgc .mgf.ar{font-size:20px}.mgc .mgf i{font-size:26px}.mgc .mgf small{font-size:11px}}
+
+.bkr{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.bkr .opt{flex:1 1 44%;font-size:15px;padding:8px 10px;margin:0}.bkr small{flex:1 0 100%;opacity:.75;font-size:13px}
