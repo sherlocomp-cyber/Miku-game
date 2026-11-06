@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes"><meta name="screen-orientation" content="landscape"><meta name="x5-orientation" content="landscape"><meta name="orientation" content="landscape"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#2a62ff">
+<title>Kota Profesi – Petualangan Bahasa Arab</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css?v=39">
+<link rel="stylesheet" href="css/minigame.css?v=39">
+<link rel="stylesheet" href="css/ui.css?v=39">
+<link rel="stylesheet" href="css/ujian-akhir.css?v=39">
+</head><body>
+<canvas id="c" role="img" aria-label="Kota Profesi 3D. Gunakan joystick atau tombol WASD untuk berjalan."></canvas>
+<div class="hud" id="stat"><div class="pill" title="Koin">🪙 <span id="co">0</span></div><div class="pill" title="Lencana warga">🏅 <span id="bd">0</span>/24</div><button class="pill" id="bkb" aria-label="Misi dan buku belajar" title="Misi dan buku belajar"><span aria-hidden="true">📋</span><span class="lb" aria-hidden="true">Misi</span></button><button class="pill" id="rvb" aria-label="Kuis ulang harian" title="Kuis ulang harian"><span aria-hidden="true">🔁</span><span id="rvn" class="bdg" aria-hidden="true"></span><span class="lb" aria-hidden="true">Ulang</span></button><button class="pill" id="mgb" aria-label="Mini game Pasangan Profesi" title="Mini game Pasangan Profesi"><span aria-hidden="true">🃏</span><span class="lb" aria-hidden="true">Main</span></button><button class="pill" id="exb" aria-label="Ujian Akhir 40 soal" title="Ujian Akhir"><span aria-hidden="true">🎓</span><span class="lb" aria-hidden="true">Ujian</span></button><button class="pill" id="ccb" aria-label="Ubah karakter" title="Ubah karakter"><span aria-hidden="true">🎨</span><span class="lb" aria-hidden="true">Gaya</span></button><button class="pill" id="mu" aria-label="Suara menyala. Ketuk untuk mematikan" title="Suara">🔊</button><button class="pill" id="fsb" aria-label="Layar penuh" title="Layar penuh">⛶</button></div>
+<canvas class="hud" id="mm" width="240" height="220" role="img" aria-label="Peta kota"></canvas>
+<div class="hud" id="qt" role="button" tabindex="0" title="Buka daftar misi"></div>
+<div id="js"><div id="kn"></div></div>
+<div id="rbar"><button id="jb">Lompat</button><button id="act">Bicara (E)</button><button id="vb"></button></div><div class="hud pill" id="ts" role="status" aria-live="polite"></div><div class="hud pill" id="cp"></div>
+<div id="exh" class="hud"><div class="row"><div class="pill" id="exno"><i id="exzd" aria-hidden="true"></i><span id="exnt">Soal 1/40</span></div><div class="ext"><i id="exbar"></i><b id="exsec">10</b></div><div class="pill" id="exalt">☁️ 0 m</div><button class="pill" id="exsp" aria-label="Dengarkan kata Arab">🔊</button><button class="pill" id="exq" aria-label="Keluar dari ujian">✖</button></div><div id="exgr" aria-hidden="true"></div><div class="pill" id="exzl" aria-hidden="true"></div></div>
+<div id="exz" aria-hidden="true"></div><div id="exf" aria-hidden="true"></div>
+<div id="exo" role="group" aria-label="Pilih jawaban"><button data-i="0" style="background:#e0524a" aria-label="Jawaban A">A</button><button data-i="1" style="background:#3d82e0" aria-label="Jawaban B">B</button><button data-i="2" style="background:#2fa56b" aria-label="Jawaban C">C</button><button data-i="3" style="background:#e0a43a" aria-label="Jawaban D">D</button></div><div id="exhint" aria-hidden="true">Tekan 1–4 atau A–D, atau klik pilar jawabannya</div>
+<div id="exw" aria-hidden="true"></div><button class="opt go" id="exfly" type="button">🪽 Terbang melihat kota<small>atau tekan Enter</small></button>
+<div id="glh" class="hud"><div class="row"><div class="pill" id="glc">🪽 Melayang di atas Kota Profesi</div><div class="pill" id="gla">☁️ 0 m</div><button class="pill" id="gls" type="button" aria-label="Lewati penerbangan">⏭ Lewati</button></div></div>
+<div id="exov" aria-hidden="true"></div><div id="exsr" class="sr" aria-live="polite"></div>
+<div id="st"><div class="card"><h1>Kota Profesi</h1><div class="ar" lang="ar">مَدِينَةُ الْمِهَنِ</div><div class="mascot" aria-hidden="true">🦉</div><p style="margin:0 0 8px">Halo! Aku <b>Kak Hud-hud</b>. Kota Profesi butuh bantuanmu belajar Bahasa Arab!</p>
+<label class="nml" for="nm">Siapa namamu?</label><input class="nm" id="nm" maxlength="20" placeholder="Tulis namamu di sini" autocomplete="off" aria-required="true" aria-describedby="nme"><div id="nme" role="alert"></div><div id="svi"></div><div id="vn" class="ex" style="display:none"></div>
+<button class="opt go" id="sb">Mulai petualangan</button>
+<div class="hw"><div><b>1</b>Ikuti panah kuning 🎯</div><div><b>2</b>Bicara dengan warga 💬</div><div><b>3</b>Jawab 5 soal, raih lencana 🏅</div></div>
+<details class="hd"><summary>Cara bermain lengkap</summary><ul><li>🎯 Ikuti <b>misi di kiri atas</b>, satu per satu. Panah kuning menunjukkan arahnya.</li><li>💬 Bicara dengan warga: pelajari kata dan pola kalimat, lalu jawab 5 soal.</li><li>🔥 Jawab beruntun untuk bonus koin. ⚡ Kotak ? kadang memberi Tantangan Kilat!</li><li>🎯 Setiap 10 jawaban benar = bonus 50 koin (maksimal 3 kali sehari). Tukar koin dengan kostum di 📋 → Toko.</li><li>🌍 Di 📋 ada tab <b>Dunia Nyata</b> (praktik bersama teman/keluarga) dan <b>Laporan</b> (untuk gurumu).</li><li>🎨 Setelah menulis nama, <b>buat karaktermu</b>: pilih gender, tampilan, dan 100+ aksesoris. Ubah kapan saja lewat tombol 🎨.</li><li>🎓 Tombol <b>Ujian</b>: 40 soal, 10 detik per soal. Jawab benar terus untuk naik ke langit, raih piala besar, lalu terbang dengan sayap melihat seluruh kota!</li><li class="kb">Gerak: WASD / joystick · Lompat: Spasi · Bicara: E · Jawaban: 1–4 · Lanjut: Enter</li><li class="th">Sentuh: geser joystick di kiri untuk berjalan. Tombol Lompat dan Bicara ada di kanan bawah.</li></ul></details>
+<div class="bkr"><button class="opt bkx">💾 Simpan data ke file</button><button class="opt bki">📂 Muat data dari file</button><small class="bkt"></small></div></div></div>
+<div id="cc"><div class="ccp" role="dialog" aria-label="Buat karakter"><div class="cch"><span id="ccn"></span><span class="pill" id="ccc">🪙 0</span></div><div id="cct"></div><div id="ccbody"></div><div class="ccf"><button class="opt" id="ccr">🎲 Acak</button><button class="opt go" id="ccd">✅ Selesai</button></div></div></div>
+<div id="rot" class="on" role="alert"><div class="rc"><div class="ri">📱↻</div><b>Putar HP-mu ke mode mendatar (landscape)</b><small>Game ini paling nyaman dimainkan secara mendatar.</small><button class="opt go" id="rotb">Tetap tegak</button></div></div>
+<div id="modal" role="dialog" aria-modal="true" aria-label="Kartu belajar dan kuis"><div class="card" id="card" tabindex="-1"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/01-data-soal.js?v=39"></script>
+<script src="js/02-kota-dunia.js?v=39"></script>
+<script src="js/03-npc-extra.js?v=39"></script>
+<script src="js/04-kota-bangun.js?v=39"></script>
+<script src="js/05-karakter-data.js?v=39"></script>
+<script src="js/06-aksesoris-v39.js?v=39"></script>
+<script src="js/07-karakter-model.js?v=39"></script>
+<script src="js/08-karakter-kustom.js?v=39"></script>
+<script src="js/09-audio-state-misi.js?v=39"></script>
+<script src="js/10-materi-kuis.js?v=39"></script>
+<script src="js/11-laporan.js?v=39"></script>
+<script src="js/12-buku-input.js?v=39"></script>
+<script src="js/13-animasi-warga.js?v=39"></script>
+<script src="js/14-item.js?v=39"></script>
+<script src="js/15-kendaraan.js?v=39"></script>
+<script src="js/16-loop-interior.js?v=39"></script>
+<script src="js/17-detail-pack.js?v=39"></script>
+<script src="js/18-mulai-minigame.js?v=39"></script>
+<script src="js/19-ujian-akhir.js?v=39"></script>
+<script src="js/20-landscape-backup.js?v=39"></script>
+</body></html>
