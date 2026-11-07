@@ -4,10 +4,10 @@
 <meta name="mobile-web-app-capable" content="yes"><meta name="screen-orientation" content="landscape"><meta name="x5-orientation" content="landscape"><meta name="orientation" content="landscape"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#2a62ff">
 <title>Kota Profesi – Petualangan Bahasa Arab</title>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=40">
-<link rel="stylesheet" href="css/minigame.css?v=40">
-<link rel="stylesheet" href="css/ui.css?v=40">
-<link rel="stylesheet" href="css/ujian-akhir.css?v=40">
+<link rel="stylesheet" href="css/base.css?v=41">
+<link rel="stylesheet" href="css/minigame.css?v=41">
+<link rel="stylesheet" href="css/ui.css?v=41">
+<link rel="stylesheet" href="css/ujian-akhir.css?v=41">
 </head><body>
 <canvas id="c" role="img" aria-label="Kota Profesi 3D. Gunakan joystick atau tombol WASD untuk berjalan."></canvas>
 <div class="hud" id="stat"><div class="pill" title="Koin">🪙 <span id="co">0</span></div><div class="pill" title="Lencana warga">🏅 <span id="bd">0</span>/24</div><button class="pill" id="bkb" aria-label="Misi dan buku belajar" title="Misi dan buku belajar"><span aria-hidden="true">📋</span><span class="lb" aria-hidden="true">Misi</span></button><button class="pill" id="rvb" aria-label="Kuis ulang harian" title="Kuis ulang harian"><span aria-hidden="true">🔁</span><span id="rvn" class="bdg" aria-hidden="true"></span><span class="lb" aria-hidden="true">Ulang</span></button><button class="pill" id="mgb" aria-label="Mini game Pasangan Profesi" title="Mini game Pasangan Profesi"><span aria-hidden="true">🃏</span><span class="lb" aria-hidden="true">Main</span></button><button class="pill" id="exb" aria-label="Ujian Akhir 40 soal" title="Ujian Akhir"><span aria-hidden="true">🎓</span><span class="lb" aria-hidden="true">Ujian</span></button><button class="pill" id="ccb" aria-label="Ubah karakter" title="Ubah karakter"><span aria-hidden="true">🎨</span><span class="lb" aria-hidden="true">Gaya</span></button><button class="pill" id="mu" aria-label="Suara menyala. Ketuk untuk mematikan" title="Suara">🔊</button><button class="pill" id="fsb" aria-label="Layar penuh" title="Layar penuh">⛶</button></div>
@@ -31,24 +31,24 @@
 <div id="rot" class="on" role="alert"><div class="rc"><div class="ri">📱↻</div><b>Putar HP-mu ke mode mendatar (landscape)</b><small>Game ini paling nyaman dimainkan secara mendatar.</small><button class="opt go" id="rotb">Tetap tegak</button></div></div>
 <div id="modal" role="dialog" aria-modal="true" aria-label="Kartu belajar dan kuis"><div class="card" id="card" tabindex="-1"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/01-data-soal.js?v=40"></script>
-<script src="js/02-kota-dunia.js?v=40"></script>
-<script src="js/07-karakter-model.js?v=40"></script>
-<script src="js/03-npc-extra.js?v=40"></script>
-<script src="js/04-kota-bangun.js?v=40"></script>
-<script src="js/05-karakter-data.js?v=40"></script>
-<script src="js/06-aksesoris-v39.js?v=40"></script>
-<script src="js/08-karakter-kustom.js?v=40"></script>
-<script src="js/09-audio-state-misi.js?v=40"></script>
-<script src="js/10-materi-kuis.js?v=40"></script>
-<script src="js/11-laporan.js?v=40"></script>
-<script src="js/12-buku-input.js?v=40"></script>
-<script src="js/13-animasi-warga.js?v=40"></script>
-<script src="js/14-item.js?v=40"></script>
-<script src="js/15-kendaraan.js?v=40"></script>
-<script src="js/16-loop-interior.js?v=40"></script>
-<script src="js/17-detail-pack.js?v=40"></script>
-<script src="js/19-ujian-akhir.js?v=40"></script>
-<script src="js/20-landscape-backup.js?v=40"></script>
-<script src="js/18-mulai-minigame.js?v=40"></script>
+<script src="js/01-data-soal.js?v=41"></script>
+<script src="js/02-kota-dunia.js?v=41"></script>
+<script src="js/07-karakter-model.js?v=41"></script>
+<script src="js/03-npc-extra.js?v=41"></script>
+<script src="js/04-kota-bangun.js?v=41"></script>
+<script src="js/05-karakter-data.js?v=41"></script>
+<script src="js/06-aksesoris-v39.js?v=41"></script>
+<script src="js/08-karakter-kustom.js?v=41"></script>
+<script src="js/09-audio-state-misi.js?v=41"></script>
+<script src="js/10-materi-kuis.js?v=41"></script>
+<script src="js/11-laporan.js?v=41"></script>
+<script src="js/12-buku-input.js?v=41"></script>
+<script src="js/13-animasi-warga.js?v=41"></script>
+<script src="js/14-item.js?v=41"></script>
+<script src="js/15-kendaraan.js?v=41"></script>
+<script src="js/16-loop-interior.js?v=41"></script>
+<script src="js/17-detail-pack.js?v=41"></script>
+<script src="js/19-ujian-akhir.js?v=41"></script>
+<script src="js/20-landscape-backup.js?v=41"></script>
+<script src="js/18-mulai-minigame.js?v=41"></script>
 </body></html>
