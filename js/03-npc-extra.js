@@ -68,5 +68,12 @@ case 22:Rc(.2,.2,.9,0xc9406a,0,.3,0,[0,0,1.2]);Rc(.21,.21,.1,0xffe066,-.2,.1,0,[
 case 23:for(let q=0;q<10;q++){const a=q*Math.PI/5;Rs(.065,q%5==0?GOLD:0xf4efe0,Math.cos(a)*.24,.1+Math.sin(a)*.24,.1)}Rc(.03,.03,.3,GOLD,0,-.2,.1);
  L(.62,.82,.16,0x6b2f6b,0,.25,.3);L(.5,.7,.17,0xfff3d0,.06,.25,.3);L(.3,.08,.18,GOLD,0,.45,.3);break}
 // perhiasan umum: jam tangan (laki-laki) / gelang (perempuan)
-const wb=f?GOLD:0x2b2b2b;B(.46,.09,.46,wb,0,-1.42,.02,null,g.armL);if(!f)B(.2,.07,.06,0xdfe8f0,0,-1.42,.26,null,g.armL)}
+const wb=f?GOLD:0x2b2b2b;B(.46,.09,.46,wb,0,-1.42,.02,null,g.armL);if(!f)B(.2,.07,.06,0xdfe8f0,0,-1.42,.26,null,g.armL);
+// detail khas: kumis/jenggot, sarung tangan, sepatu bot
+const hN=[0x2a1b14,0x3b2a20,0x5a3a22,0x1a1a1a][i&3],fh=!f?(i==9?'b':[1,2,11].includes(i)||(i>=12&&i%2==0)?'m':i==5?'s':''):'';
+if(fh=='m'||fh=='b')B(.5,.07,.08,hN,0,3.455,.65);
+if(fh=='b'){B(.7,.3,.24,hN,0,3.2,.5);both(k=>B(.14,.4,.3,hN,k*.6,3.25,.45))}
+if(fh=='s')B(.9,.28,.06,dk(0x8a6a50,.2),0,3.2,.6);
+const GL={0:0xc9a46a,1:0xffcf3f,4:0x9fd6f0,5:0x2b2b2b}[i];if(GL!=null)[g.armL,g.armR].forEach(a=>{B(.44,.44,.44,GL,0,-1.52,.02,null,a);B(.5,.1,.5,dk(GL,.2),0,-1.3,0,null,a)});
+const BT={0:0x6b4a2a,1:0x6b4a2a,3:0x111111,5:0x2b2b2b}[i];if(BT!=null)[g.legL,g.legR].forEach(l=>{B(.62,.42,.62,BT,0,-1.2,0,null,l);B(.64,.06,.64,dk(BT,.3),0,-1.0,0,null,l)})}
 // ===== /npcExtra

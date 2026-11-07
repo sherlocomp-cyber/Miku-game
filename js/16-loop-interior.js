@@ -43,7 +43,7 @@ function loop(){requestAnimationFrame(loop);const dt=Math.min(cl.getDelta(),.05)
 if(!open){let ix=(key.d||key.arrowright?1:0)-(key.a||key.arrowleft?1:0)+jx,iy=(key.w||key.arrowup?1:0)-(key.s||key.arrowdown?1:0)+jy;
 if(pl.kb>0){ix=0;iy=0}const l=Math.hypot(ix,iy);if(l>1){ix/=l;iy/=l}
 if(RID)rideStep(ix,iy,dt);else if(l>.05){const s=Math.sin(pl.yaw),c=Math.cos(pl.yaw);const mx=-s*iy+c*ix,mz=-c*iy-s*ix;const sp=(key.shift?20:12)*dt;
-pl.x+=mx*sp;pl.z+=mz*sp;P.rotation.y=Math.atan2(mx,mz);pl.ph+=dt*12}
+pl.x+=mx*sp;pl.z+=mz*sp;{const ty=Math.atan2(mx,mz);let da=ty-P.rotation.y;da=Math.atan2(Math.sin(da),Math.cos(da));P.rotation.y+=da*Math.min(1,dt*14)}pl.ph+=dt*12}
 if(pl.kb>0){pl.kb-=dt;pl.x+=pl.kx*dt;pl.z+=pl.kz*dt;const dc=Math.pow(.04,dt);pl.kx*=dc;pl.kz*=dc}
 walls.forEach(w=>{const cx=Math.max(w.x-w.hw,Math.min(pl.x,w.x+w.hw)),cz=Math.max(w.z-w.hd,Math.min(pl.z,w.z+w.hd));
 let dx=pl.x-cx,dz=pl.z-cz;const d=Math.hypot(dx,dz);if(d<WRAD){if(RID)RID.sp*=.5;if(d<.001){dx=1;dz=0}else{dx/=d;dz/=d}pl.x=cx+dx*WRAD;pl.z=cz+dz*WRAD}});
@@ -52,11 +52,11 @@ const moving=Math.hypot(jx,jy)>.05||key.w||key.s||key.a||key.d||key.arrowup||key
 const sw=Math.sin(pl.ph)*(moving&&!open?.7:0);
 P.legL.rotation.x=sw;P.legR.rotation.x=-sw;P.armL.rotation.x=-sw;P.armR.rotation.x=sw;
 if(!open){if(!RID&&pl.y<=0&&(key[' ']||jmp)){pl.vy=15;snd(420,.1,'sine')}jmp=0;pl.vy-=42*dt;pl.y=Math.max(0,pl.y+pl.vy*dt);if(pl.y==0&&pl.vy<0)pl.vy=0}const BK=RID&&RID.n=='Sepeda';if(BK){P.scale.setScalar(.55);P.rotation.y=pl.yaw+Math.PI;pl.ph+=dt*Math.abs(RID.sp)*.9;const pd=Math.sin(pl.ph)*.5;P.legL.rotation.x=-.5+pd;P.legR.rotation.x=-.5-pd;P.armL.rotation.x=P.armR.rotation.x=-.95}else if(P.scale.x!=1)P.scale.setScalar(1);
-P.rotation.x=pl.kb>0?(1-pl.kb/.8)*Math.PI*2:0;P.position.set(pl.x,pl.y+(pl.y?0:(BK?0:Math.abs(sw)*.15))+(BK?.6:0),pl.z);if(EXM.on||EXM.lie)EXM.post(dt,t);
+P.rotation.x=pl.kb>0?(1-pl.kb/.8)*Math.PI*2:0;P.position.set(pl.x,pl.y+(pl.y?0:(BK?0:Math.abs(sw)*.15))+(BK?.6:0),pl.z);charLife(P,t,{idle:1,mv:moving&&!open});if(EXM.on||EXM.lie)EXM.post(dt,t);
 yawc+=(pl.yaw-yawc)*.2;const cs=Math.sin(yawc),cc=Math.cos(yawc);
 if(CV){CV.a+=dt*.7;P.rotation.y=CV.a;const W=innerWidth,H=innerHeight;const ls=W>H;cam.position.set(pl.x,ls?5.4:5,pl.z+(ls?11:16));cam.lookAt(pl.x,3.2,pl.z);if(ls)cam.setViewOffset(W,H,W*.24,0,W,H);else cam.setViewOffset(W,H,0,H*.27,W,H)}else if(EXM.on){EXM.cam(dt,t)}else{camD+=((RID?RID.cd:14)-camD)*.06;cam.position.set(pl.x+cs*camD,9+(camD-14)*.3,pl.z+cc*camD);cam.lookAt(pl.x,3+pl.y*.5,pl.z)}
 intChk(t);near=null;let nd=9;pois.forEach(p=>{p.mk.rotation.y=t*2;p.mk.position.y=6+Math.sin(t*3+p.i)*.3;npcAct(p,t);p.sp.position.set(p.mk.position.x,p.mk.position.y+2.4,p.mk.position.z);
-const d=Math.hypot(p.n.position.x-pl.x,p.n.position.z-pl.z);bub(p,d);if(d<nd){nd=d;near=p}});
+const d=Math.hypot(p.n.position.x-pl.x,p.n.position.z-pl.z);bub(p,d);charLife(p.n,t,{talk:d<6&&!open});if(d<nd){nd=d;near=p}});
 STN.forEach(s=>{s.mk.rotation.y=t*2;s.mk.position.y=7.4+Math.sin(t*3)*.3;const d=Math.hypot(s.x-pl.x,s.z-pl.z);if(d<8&&d<nd){nd=d;near=s}});
 if(INTR.on){near=Math.hypot(pl.x-RMX,pl.z-(RMZ-3))<5.5?pois[INTR.b.i]:null}if(near&&!open){if(lastNear!==near){actB.innerHTML=near.kind=='st'?`Belajar di <b>${near.t}</b><br><small class="ar">${near.ar}</small>`:`Bicara dengan <span class="ar">${near.d.n}</span><br><small>${AC[near.i]}</small> <small class="ar">${AR[near.i]}</small>`;if(near.kind!='st'&&t-(near.gt??-99)>45){near.gt=t;const pe=PE(near),nm=NM||'teman',w=near.lv>0?`Halo lagi, ${nm}! ${'⭐'.repeat(near.lv)} ${near.lv>=3?'Kamu jagoan di sini!':'Yuk, lanjut belajar bareng.'}`:`Halo, ${nm}! ${pe[2]}`;ts(`${near.d.e} <b>${pe[0]}</b>: “${w}”`,4500)}lastNear=near}actB.style.display='block'}else{actB.style.display='none';lastNear=null}
 // minimap

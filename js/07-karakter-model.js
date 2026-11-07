@@ -21,7 +21,7 @@ function CH(g,o){const K=KIT(g),{B,Co,both,dk,SH,HL}=K;
   B(.4,.4,.4,sk,0,-1.52,.02,null,a);B(.1,.16,.12,sk,-k*.22,-1.48,.1,null,a);[-1.62,-1.7].forEach(y=>B(.3,.03,.03,dk(sk,.25),0,y,.225,null,a));
   if(k<0){g.legL=l;g.armL=a}else{g.legR=l;g.armR=a;g.HD=new THREE.Group();g.HD.position.set(0,-1.45,.15);a.add(g.HD)}});
  // badan: torso, detail kemeja, rok/ikat pinggang
- B(1.7,1.7,.92,mo(),0,2.3,0);
+ g.TOR=B(1.7,1.7,.92,mo(),0,2.3,0);
  if(o.col)both(k=>B(.34,.12,.05,o.col,k*.22,3.04,.475,[0,0,-k*.7]));
  B(.96,.13,.64,o.col??SH,0,3.14,.03);
  if(o.btn){B(.07,1.45,.02,SH,0,2.4,.47);for(let q=0;q<4;q++)B(.1,.1,.03,0xefefef,0,2.9-q*.34,.48)}
@@ -36,7 +36,7 @@ function CH(g,o){const K=KIT(g),{B,Co,both,dk,SH,HL}=K;
  B(1.3,1.4,1.2,sk,0,3.75,0);both(k=>B(.1,.3,.2,sk,k*.67,3.72,0));B(.12,.18,.12,dk(sk,.08),0,3.6,.64);
  both(k=>{const x=k*.28;B(.34,.3,.06,0xffffff,x,3.8,.62);B(.15,.22,.06,ec,x+k*.02,3.79,.655);B(.05,.05,.06,0xffffff,x+k*.05,3.85,.69);
   B(.42,.1,.08,dk(hc,.2),x,4.06,.63,[0,0,k*.1]);if(f){B(.38,.05,.06,0x111111,x,3.97,.64);B(.2,.1,.04,0xff9aa0,k*.46,3.5,.61)}});
- B(f?.26:.3,f?.08:.05,.05,f?0xd04a5a:0x8a2f3a,0,3.38,.62);
+ g.MO=B(f?.26:.3,f?.08:.05,.05,f?0xd04a5a:0x8a2f3a,0,3.38,.62);
  // hijab (NPC) atau rambut balok
  if(o.hjc!=null){const h=o.hjc,c2=dk(h,.12);B(1.5,.6,1.45,h,0,4.5,-.02);B(1.5,1.6,.3,h,0,3.6,-.68);both(k=>B(.2,1.25,1.3,h,k*.76,3.82,.02));B(1.3,.22,.2,h,0,4.33,.66);B(1.5,.45,.3,h,0,3.0,.56);
   B(1.8,.9,1.0,h,0,2.85,.02);both(k=>B(.03,.8,.02,SH,k*.4,2.85,.525));if(o.hjl){B(1.9,1.3,1.02,h,0,2.5,.02);B(.04,1.2,.02,SH,0,2.5,.54)}B(.14,.14,.05,0xe8c050,.5,3.05,.6)}
@@ -62,7 +62,43 @@ function CH(g,o){const K=KIT(g),{B,Co,both,dk,SH,HL}=K;
   if(o.hjc==null&&!o.hj&&hs!=4)[-.42,0,.42].forEach(x=>B(.06,.03,1.1,lh,x,4.65,-.02));
   [g.legL,g.legR].forEach(l=>{B(.34,.04,.04,0xf3f3f3,0,-1.18,.45,null,l);B(.34,.04,.04,0xf3f3f3,0,-1.25,.38,null,l);B(.5,.14,.12,SH,0,-1.43,.62,null,l)});
   if(o.hjc==null&&!o.hj&&hs!=4)B(.8,.05,.5,HL,-.2,4.64,.2)}
+ fineChar(g,o,K);
 }
+// ---- Detail halus (v40): dipakai pemain dan semua NPC lewat CH() ----
+// Wajah (kelopak kedip, lipatan mata, hidung, gigi, bintik), rambut, jahitan baju, kancing celana, sepatu, kuku, bayangan tanah.
+function fineChar(g,o,K){const {B,both,dk,SH,HL}=K,f=o.f,sk=o.sk,hc=o.hc,hs=o.hs,S=o.sl=='s'?.62:1,
+ lt=(c,t)=>new THREE.Color(c).lerp(new THREE.Color(0xffffff),t).getHex(),
+ hair=o.hjc==null&&!o.hj&&hs!=4,tr=!f||o.tr,by=tr?1.6:2.28,legs=[g.legL,g.legR],arms=[g.armL,g.armR];
+ // kelopak mata: tersembunyi, dipakai charLife() untuk berkedip
+ g.lids=[];both(k=>{const p=new THREE.Group();p.position.set(k*.28,3.97,.73);p.scale.y=.001;p.visible=false;g.add(p);B(.4,.34,.03,sk,0,-.17,0,null,p);B(.4,.03,.035,dk(sk,.3),0,-.33,.005,null,p);g.lids.push(p)});
+ // wajah: lipatan kelopak, kantong mata, jembatan hidung, lubang hidung, gigi, tulang rahang, cuping telinga
+ both(k=>{B(.34,.025,.04,dk(sk,.2),k*.28,3.99,.625);B(.3,.02,.04,dk(sk,.14),k*.28,3.6,.615);B(.035,.04,.05,dk(sk,.4),k*.06,3.55,.7);B(.1,.1,.14,dk(sk,.05),k*.67,3.52,0)});
+ B(.07,.22,.06,lt(sk,.12),0,3.72,.63);B(.14,.025,.04,0xffffff,0,3.405,.665);B(1.3,.06,1.2,dk(sk,.1),0,3.08,0);
+ if((sk+hc)%5==0)[-.4,-.33,-.26,.26,.33,.4].forEach((x,q)=>B(.035,.035,.03,dk(sk,.25),x,3.5+(q%2)*.04,.61));
+ // rambut: cambang, rambut tengkuk, jepit (perempuan)
+ if(hair){both(k=>B(.08,.38,.3,hc,k*.67,3.78,.45));B(1.3,.18,.1,dk(hc,.15),0,3.5,-.66);if(f)B(.22,.08,.06,0xff6b9a,.52,4.25,.66,[0,0,.5])}
+ // baju: jahitan bahu & punggung, lipatan siku, kelim lengan, ikat pinggang
+ both(k=>B(.05,.45,.94,SH,k*.82,2.95,0));B(.05,1.5,.02,SH,0,2.4,-.47);B(1.6,.04,.02,SH,0,2.95,-.47);
+ arms.forEach(a=>{if(S==1){B(.56,.05,.56,SH,0,-1.18,0,null,a);B(.52,.025,.52,SH,0,-.62,0,null,a)}else B(.55,.03,.55,SH,0,-.5,0,null,a)});
+ if(o.belt!==false)[-.6,-.2,.2,.6].forEach(x=>B(.08,.2,.04,dk(o.bc??0x3b2a20,.25),x,by,.5));
+ // celana & sepatu: tambalan lutut, ujung celana, tumit, ujung sepatu
+ legs.forEach(l=>{if(!o.sh){B(.5,.22,.02,SH,0,-.62,.288,null,l);B(.6,.05,.6,SH,0,-1.12,0,null,l)}
+  B(.6,.16,.2,dk(o.sc,.35),0,-1.38,-.2,null,l);B(.6,.2,.33,lt(o.sc,.12),0,-1.36,.5,null,l)});
+ // kuku jari dan gelang/jam tangan pemain
+ arms.forEach(a=>[-.12,-.04,.04,.12].forEach(x=>B(.06,.04,.02,lt(sk,.35),x,-1.69,.225,null,a)));
+ if(o.om){B(.46,.09,.46,0x3d6fd6,0,-1.42,.02,null,g.armL);B(.2,.07,.06,0xdfe8f0,0,-1.42,.26,null,g.armL)}
+ // bayangan tanah (diganti baru tiap karakter dirakit ulang)
+ if(g.blob&&g.blob.parent)g.blob.parent.remove(g.blob);
+ const bl=new THREE.Mesh(new THREE.CircleGeometry(1.5,20),new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:.2,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
+ bl.rotation.x=-Math.PI/2;bl.position.y=.04;bl.scale.set(1.15,1,1);bl.renderOrder=1;g.add(bl);g.blob=bl}
+// Animasi hidup: napas, kedip, mulut bicara, bayangan, ayunan lengan saat diam
+function charLife(g,t,o){if(!g||!g.lids)return;o=o||{};const ph=g.__ph??(g.__ph=Math.random()*20);
+ if(g.TOR)g.TOR.scale.y=1+Math.sin(t*2.1+ph)*.015;
+ const c=(t+ph)%3.4,cl=c<.14?Math.sin(c/.14*Math.PI):0;
+ g.lids.forEach(p=>{p.visible=cl>.05;p.scale.y=Math.max(.001,cl)});
+ if(g.MO){g.MO.scale.y=o.talk?.4+Math.abs(Math.sin(t*9+ph))*.9:1;g.MO.scale.x=o.talk?.9:1}
+ if(g.blob){const sy=g.scale.y||1;g.blob.position.y=(.04-g.position.y)/sy;g.blob.visible=Math.abs(g.rotation.x)<.01}
+ if(o.idle&&g.armL){const a=o.mv?0:1,w=Math.sin(t*1.8);g.armL.rotation.z=-.03-.012*w*a;g.armR.rotation.z=.03+.012*Math.sin(t*1.8+1)*a}}
 function HERO(){
  const h=G.hero,f=h.g=='f',sk=SKN[h.sk]??SKN[1],hc=HRC[h.hc]??HRC[1],ec=EYC[h.ey]??EYC[0],oc=(OUT[G.cur]||OUT[0]).c,w=h.a||{};
  [...P.children].forEach(c=>P.remove(c));PM.length=0;

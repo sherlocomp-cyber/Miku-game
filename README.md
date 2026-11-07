@@ -13,7 +13,7 @@ yang dimuat **berurutan** sesuai nomornya, jadi urutan nomor jangan diubah.
 | `js/04-kota-bangun.js` | Dekorasi, `build()`, pohon/hiasan, pemain, seragam |
 | `js/05-karakter-data.js` | Data karakter dan aksesoris dasar |
 | `js/06-aksesoris-v39.js` | Aksesoris v39 dan tabel harga bertingkat (`HG`) |
-| `js/07-karakter-model.js` | Model karakter `CH()` dan `HERO()` |
+| `js/07-karakter-model.js` | Model karakter `CH()`, `HERO()`, detail halus `fineChar()`, animasi hidup `charLife()` |
 | `js/08-karakter-kustom.js` | Layar kustomisasi karakter |
 | `js/09-audio-state-misi.js` | Audio dan suara, state, misi (`MS`), quest (`QS`), simpan/muat |
 | `js/10-materi-kuis.js` | Kartu materi dan kuis |
@@ -35,4 +35,4 @@ yang dimuat **berurutan** sesuai nomornya, jadi urutan nomor jangan diubah.
 ## Cara update
 
 1. Ubah file yang sesuai di tabel di atas.
-2. Naikkan angka `?v=39` di `index.html` (misalnya jadi `?v=40`) agar browser memuat versi baru.
+2. Naikkan angka `?v=40` di `index.html` (misalnya jadi `?v=41`) agar browser memuat versi baru.
