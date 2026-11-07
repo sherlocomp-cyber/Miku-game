@@ -1,14 +1,16 @@
 # CATATAN PROYEK: Kota Profesi (Miku-game)
 
-Repo: sherlocomp-cyber/Miku-game · dipublish lewat GitHub Pages · struktur: index.html, css/, js/01-22.
+Repo: sherlocomp-cyber/Miku-game · dipublish lewat GitHub Pages · struktur: index.html, css/, js/01-23.
 
-## Tugas aktif (2026-11-07)
-Masalah: layar HP mendatar "terlalu rame" (10 tombol atas, kartu misi panjang, kartu panduan 3 baris, chip "Masjid – 6 m" ganda, tombol Bicara besar, peta besar).
+## Tugas 2026-11-07: rapikan HUD "terlalu rame" (SELESAI, belum diuji di HP)
+- [x] css/ringkas.css : HUD ringkas untuk layar sentuh / lebar <= 900px
+- [x] js/23-ringkas-hud.js : tombol ☰ Menu (🔁 🃏 🎓 🎨 🔊 ⛶ masuk menu), kartu misi hanya 2 baris
+- [x] index.html : memasang keduanya (?v=44)
+- [x] CATATAN.md
 
-Rencana (tiap file langsung di-push, urutan):
-1. [ ] css/ringkas.css  : gaya HUD ringkas (HP / layar sentuh)
-2. [ ] js/23-ringkas-hud.js : tombol ☰ Menu (tombol jarang dipakai disembunyikan), kartu misi 2 baris
-3. [ ] index.html : pasang css/ringkas.css dan js/23-ringkas-hud.js (versi ?v=44)
-4. [ ] CATATAN.md : tandai selesai
+Efek: chip arah ganda di kiri atas (#cp) disembunyikan; kartu panduan (#gc) jadi 1 baris di dasar layar antara joystick dan tombol Bicara; tombol Bicara dan peta lebih kecil.
+Untuk membatalkan: hapus <link> css/ringkas.css dan <script> js/23 di index.html.
 
-Aturan kerja: jangan ubah file 01-22 kecuali perlu; modul 23 mandiri. Jika kuota habis, lanjutkan dari daftar centang di atas.
+## Berikutnya (tunggu hasil uji pengguna)
+- Cek di HP: apakah tombol ☰ terbuka, kartu panduan tidak menimpa tombol Bicara, teks Arab di tombol Bicara masih terbaca.
+- Kalau masih ramai: sembunyikan juga penunjuk tepi layar (#gp) saat jarak < 15 m, atau gabungkan kartu misi ke tombol 📋.
