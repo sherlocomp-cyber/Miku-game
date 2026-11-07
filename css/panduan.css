@@ -1,0 +1,31 @@
+/* ===== Bagian 22: Panduan "Ke mana? Ngapain?" ===== */
+#gc{position:fixed;z-index:5;left:50%;top:max(10px,env(safe-area-inset-top,0px));transform:translateX(-50%);width:max-content;max-width:min(380px,50vw);background:var(--paper);border:3px solid var(--ink);border-radius:16px;padding:5px 10px 6px;box-shadow:0 3px 0 var(--ink);cursor:pointer;line-height:1.25;touch-action:manipulation;display:none}
+#gc:hover{filter:brightness(1.03)}
+#gc .gc1{display:flex;align-items:center;gap:6px}
+#gc .gcn{flex:none;min-width:24px;height:24px;line-height:19px;text-align:center;border-radius:12px;background:var(--sun);border:2px solid var(--ink);font-weight:700;font-size:14px;padding:0 4px}
+#gc b{flex:1 1 auto;min-width:0;font-size:16px}
+#gc .gcd{flex:none;font-weight:700;font-size:14px;background:#fff;border:2px solid var(--ink);border-radius:999px;padding:0 8px}
+#gc .gcd:empty{display:none}
+#gc .gcq{flex:none;font-size:15px;opacity:.75}
+#gc .gcs{font-size:13px;margin-top:2px;opacity:.92}
+.gcp{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.gcp i{font-style:normal;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:2px solid var(--line);background:#fff;opacity:.7}
+.gcp i.on{background:var(--sun);border-color:var(--ink);opacity:1}
+.gcp i.ok{background:#b9f1d3;border-color:var(--mint);opacity:1}
+#gc.nudge{animation:gcn .6s ease-in-out 6}
+@keyframes gcn{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.06)}}
+#gc.bot{top:auto;bottom:calc(max(24px,env(safe-area-inset-bottom,0px)) + 56px)}
+/* penunjuk arah di layar */
+#gp{position:fixed;left:0;top:0;z-index:4;pointer-events:none;display:none;align-items:center;gap:6px;will-change:transform}
+#gp.on{flex-direction:column;gap:2px}
+#gp .gpl{background:var(--paper);border:3px solid var(--ink);border-radius:12px;padding:1px 9px;box-shadow:0 3px 0 var(--ink);line-height:1.15;white-space:nowrap;text-align:center}
+#gp .gpl b{display:block;font-size:15px}
+#gp .gpl small{font-size:13px;font-weight:700}
+#gp .gpa{flex:none;filter:drop-shadow(0 2px 0 #1d2b5399)}
+/* tombol berdenyut saat saatnya ditekan */
+@keyframes gpp{0%,100%{box-shadow:0 5px 0 var(--ink),0 0 0 0 #ffcf3fdd}50%{box-shadow:0 5px 0 var(--ink),0 0 0 14px #ffcf3f00}}
+@keyframes gpq{0%,100%{box-shadow:0 3px 0 var(--ink),0 0 0 0 #ffcf3fdd}50%{box-shadow:0 3px 0 var(--ink),0 0 0 12px #ffcf3f00}}
+#act.gp-pulse{animation:gpp 1s ease-out infinite}
+#bkb.gp-pulse{animation:gpq 1s ease-out infinite}
+.hd ul{margin:4px 0 10px;padding-left:20px;line-height:1.5;font-size:15px}
+@media (max-height:440px){#gc b{font-size:15px}#gc .gcs{font-size:12px}#gc .gcp i{font-size:11px;padding:0 7px}}
