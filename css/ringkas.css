@@ -1,0 +1,40 @@
+/* ===== Bagian 23: HUD ringkas (HP / layar sentuh) =====
+   Dimuat setelah panduan.css. Hanya mengatur tampilan; logika ada di js/23-ringkas-hud.js */
+@media (pointer:coarse),(max-width:900px){
+ /* chip arah ganda di kiri atas dihapus (sudah ada penunjuk di layar + jarak di kartu panduan) */
+ #cp{display:none!important}
+
+ /* baris atas: hanya tombol inti; sisanya masuk menu ☰ */
+ #stat{display:flex;flex-wrap:wrap;align-items:center;max-width:calc(100vw - 150px)}
+ #stat.mo{z-index:12}
+ #stat .pill{order:0}
+ #stat #hmb{order:1}
+ #stat .hbr{order:2;flex:0 0 100%;height:0;display:none}
+ #stat .pill.mx{order:3;display:none}
+ #stat.mo .hbr{display:block}
+ #stat.mo .pill.mx{display:inline-flex}
+ #hmb{position:relative}
+ #hmb .dot{position:absolute;right:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#e0524a;border:2px solid var(--ink);display:none}
+ #hmb.has .dot{display:block}
+
+ /* kartu misi: cukup dua baris (judul misi) */
+ #qt{width:min(260px,38vw);padding:6px 10px}
+
+ /* kartu panduan: satu baris di dasar layar, di antara joystick dan tombol Bicara */
+ #gc,#gc.bot{top:auto!important;transform:none!important;
+  bottom:calc(max(24px,env(safe-area-inset-bottom,0px)) + 6px)!important;
+  left:max(160px,19vw)!important;
+  max-width:min(300px,calc(100vw - 520px))!important;
+  padding:4px 10px}
+ #gc .gcs,#gc .gcp{display:none}
+ #gc .gcq{display:none}
+ #gc.nudge{animation:gcn2 .6s ease-in-out 6}
+ @keyframes gcn2{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+ /* tombol Bicara lebih kecil */
+ #rbar #act{font-size:15px;min-height:46px;max-width:min(38vw,250px);padding:4px 12px;line-height:1.25}
+}
+@media (max-height:440px){
+ #mm{width:118px;height:108px}
+ #gc b{font-size:14px}
+}
