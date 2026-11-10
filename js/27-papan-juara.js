@@ -5,6 +5,8 @@
    2) Tombol 🏆 Juara di HUD (di HP: di dalam menu ☰) membuka daftar lengkap kapan saja. Urut: Skor / Lencana / Bintang.
    3) Data: tiap murid menulis ringkasannya ke Firebase /papan/<nama> (nama, skor, lencana, bintang, koin, misi, benar).
       Murid lain hanya membaca. Bila /papan kosong atau tidak terbaca, daftar dibaca dari /siswa (ringkasan dari js/26).
+   4) Tab 📝 Ujian (ujian akhir, 40 soal -> nilai 0-100) dan 🎯 SAS (simulasi SAS, nilai 0-100). Tingkatan: Mahir >=80, Berkembang >=60, selain itu Perlu bimbingan.
+      Disimpan sebagai ua dan sx di /papan/<nama>; hanya nilai terbaik yang dikirim.
    Aturan aman: skor di papan TIDAK pernah ditimpa skor yang lebih rendah. Tombol "Mulai dari awal" ikut menghapus catatan papan.
    Nama murid selalu di-escape sebelum ditampilkan. Rumus skor sama dengan js/26 (lencana 50, bintang 30, benar 3, misi 20, pencapaian 10).
    Cara balik ke tampilan lama: hapus baris <script> js/27 dan <link> css/papan.css di index.html. */
@@ -28,9 +30,11 @@ const jf=(p,o)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),9000);
 
 /* ---------- 1) Simpan ringkasan sendiri ---------- */
 let ok=false,cs=0,last='',rst=false;try{rst=!!sessionStorage.getItem('kp.fbreset')}catch(e){}
-function me(){const d=jp(g(KS));if(!d||typeof d!=='object')return null;return Object.assign({nama:nm,skor:skor(d),ts:Date.now()},ring(d))}
+const UAN=40,nU=d=>{const b=+(d&&d.ex&&d.ex.best);return isFinite(b)&&b>0?Math.min(100,Math.round(Math.min(b,UAN)/UAN*100)):0};
+const nX=o=>{const v=o&&typeof o==='object'?+o.nilai:0;return isFinite(v)&&v>0?Math.min(100,Math.round(v)):0};
+function me(){const d=jp(g(KS));if(!d||typeof d!=='object')return null;return Object.assign({nama:nm,skor:skor(d),ts:Date.now(),ua:nU(d),sx:nX(jp(g('kp.sasx')))},ring(d))}
 function up(ka){if(!ok||!key)return;const m=me();if(!m||!m.skor||m.skor<cs)return;
- const sig=[m.skor,m.lencana,m.bintang,m.koin,m.misi,m.benar].join();if(sig===last)return;
+ const sig=[m.skor,m.lencana,m.bintang,m.koin,m.misi,m.benar,m.ua,m.sx].join();if(sig===last)return;
  fetch(DB+pth(),{method:'PUT',body:JSON.stringify(m),headers:{'Content-Type':'application/json'},keepalive:!!ka}).then(r=>{if(r.ok){last=sig;cs=m.skor}}).catch(()=>{})}
 function init(){if(ok||!key||init.b)return;init.b=1;
  (rst?jf(pth(),{method:'DELETE'}).then(()=>null):jf(pth())).then(o=>{cs=o&&typeof o==='object'?num(o.skor):0;rst=false;ok=true;up()}).catch(()=>{}).then(()=>{init.b=0})}
@@ -38,9 +42,9 @@ function init(){if(ok||!key||init.b)return;init.b=1;
 /* ---------- 2) Baca daftar juara ---------- */
 function norm(k,v,fb){if(!v||typeof v!=='object')return null;
  const nama=String(v.nama||'').trim().slice(0,24);if(!nama)return null;
- const r=fb?(v.ringkas&&typeof v.ringkas==='object'?v.ringkas:{}):v;let s=num(r.skor);
- if(fb){const d=typeof v.data==='string'?jp(v.data):null;s=d&&typeof d==='object'?skor(d):num(r.lencana)*50+num(r.bintang)*30+num(r.benar)*3+num(r.misi)*20}
- return{k,nama,skor:s,lencana:num(r.lencana,24),bintang:num(r.bintang,24),koin:num(r.koin),misi:num(r.misi,14),benar:num(r.benar),ts:+v.ts||0}}
+ const r=fb?(v.ringkas&&typeof v.ringkas==='object'?v.ringkas:{}):v;let s=num(r.skor),ua=num(r.ua,100),sx=num(r.sx,100);
+ if(fb){const d=typeof v.data==='string'?jp(v.data):null;s=d&&typeof d==='object'?skor(d):num(r.lencana)*50+num(r.bintang)*30+num(r.benar)*3+num(r.misi)*20;ua=nU(d);sx=nX(typeof v.sasx==='string'?jp(v.sasx):null)}
+ return{k,nama,skor:s,lencana:num(r.lencana,24),bintang:num(r.bintang,24),koin:num(r.koin),misi:num(r.misi,14),benar:num(r.benar),ua,sx,ts:+v.ts||0}}
 const pick=(o,fb)=>o&&typeof o==='object'?Object.keys(o).map(k=>norm(k,o[k],fb)).filter(x=>x&&(x.skor>0||x.lencana>0)):[];
 let cache=null,loading=null;
 function load(force){
@@ -54,18 +58,20 @@ function load(force){
 
 /* ---------- 3) Daftar lengkap (kartu) ---------- */
 let tab='s',view='load';
-const TT={s:'🏆 Skor',l:'🏅 Lencana',b:'⭐ Bintang'},MED=['🥇','🥈','🥉'];
+const TT={s:'🏆 Skor',l:'🏅 Lencana',b:'⭐ Bintang',u:'📝 Ujian',x:'🎯 SAS'},MED=['🥇','🥈','🥉'];
+const tier=n=>n>=80?'🌟 Mahir':n>=60?'👍 Berkembang':'🌱 Perlu bimbingan';
 const ttl=m=>{try{return RK[Math.min(5,Math.floor(m/2))]}catch(e){return ''}};
-const val=x=>({s:x.skor,l:x.lencana,b:x.bintang})[tab];
-function sorted(a){const r=a.slice().sort((p,q)=>val(q)-val(p)||q.skor-p.skor||p.nama.localeCompare(q.nama));let pr=0,pv=null;r.forEach((x,i)=>{const v=val(x);x.r=v===pv?pr:i+1;pr=x.r;pv=v});return r}
-function row(x){return `<div class="pjr${x.k===key?' me':''}"><span class="pjn">${MED[x.r-1]||x.r}</span><span class="pjm"><b>${esc(x.nama)}</b><small>${esc(ttl(x.misi))} · 🪙 ${x.koin}</small></span><span class="pjs">🏅${x.lencana}/24 ⭐${x.bintang}</span><span class="pjv">${val(x)}</span></div>`}
+const val=x=>({s:x.skor,l:x.lencana,b:x.bintang,u:x.ua,x:x.sx})[tab];
+function sorted(a){const r=a.filter(x=>tab!=='u'&&tab!=='x'||val(x)>0).sort((p,q)=>val(q)-val(p)||q.skor-p.skor||p.nama.localeCompare(q.nama));let pr=0,pv=null;r.forEach((x,i)=>{const v=val(x);x.r=v===pv?pr:i+1;pr=x.r;pv=v});return r}
+function row(x){return `<div class="pjr${x.k===key?' me':''}"><span class="pjn">${MED[x.r-1]||x.r}</span><span class="pjm"><b>${esc(x.nama)}</b><small>${esc(ttl(x.misi))} · 🪙 ${x.koin}</small></span><span class="pjs">${tab==='u'||tab==='x'?esc(tier(val(x))):'🏅'+x.lencana+'/24 ⭐'+x.bintang}</span><span class="pjv">${val(x)}</span></div>`}
 function card(){const c=Q('#card');if(!c)return;
  let h=`<h2>🏆 Papan Juara</h2><div class="who">Lihat pencapaian teman-temanmu dan semangat belajar bersama!</div><div class="tabs">${Object.keys(TT).map(k=>`<button class="opt${k===tab?' on':''}" data-t="${k}">${TT[k]}</button>`).join('')}</div>`;
  if(view==='load')h+='<div class="ex">⏳ Mengambil daftar juara…</div>';
  else if(view==='err'){const m=me();h+=`<div class="ex">☁️ Belum tersambung ke internet, jadi daftar teman belum bisa dimuat.${m?`<br>Pencapaianmu: 🏅 ${m.lencana}/24 · ⭐ ${m.bintang} · ${m.skor} poin`:''}</div>`}
  else{const L=sorted(view.a),n=L.length,i=L.findIndex(x=>x.k===key),top=L.slice(0,30);if(i>=30)top.push(L[i]);
-  h+=i>=0?`<div class="mi done">Peringkatmu: <b>#${L[i].r}</b> dari ${n} murid</div>`:`<div class="ex">${key?'Kamu belum masuk papan. Jawab beberapa soal, lalu tunggu sekitar 10 detik ya!':'Tulis namamu di layar awal supaya masuk papan.'}</div>`;
-  h+=n?top.map(row).join(''):'<div class="ex">Belum ada juara. Jadilah yang pertama! 🌟</div>';
+  if(tab==='u'||tab==='x')h+='<div class="fc">'+(tab==='u'?'Nilai ujian akhir = jawaban benar terbaik dari 40 soal.':'Nilai terbaik simulasi SAS.')+' Mahir ≥80 · Berkembang ≥60 · selain itu Perlu bimbingan. Ini latihan, bukan nilai rapor.</div>';
+  h+=i>=0?`<div class="mi done">Peringkatmu: <b>#${L[i].r}</b> dari ${n} murid${tab==='u'||tab==='x'?' · '+esc(tier(val(L[i]))):''}</div>`:tab==='u'||tab==='x'?`<div class="ex">Kamu belum punya nilai ${tab==='u'?'ujian akhir':'simulasi SAS'}. Kerjakan dulu, lalu tunggu sekitar 10 detik ya!</div>`:`<div class="ex">${key?'Kamu belum masuk papan. Jawab beberapa soal, lalu tunggu sekitar 10 detik ya!':'Tulis namamu di layar awal supaya masuk papan.'}</div>`;
+  h+=n?top.map(row).join(''):'<div class="ex">Belum ada juara'+(tab==='u'||tab==='x'?' di tab ini':'')+'. Jadilah yang pertama! 🌟</div>';
   h+=`<div class="pjf">Diperbarui ${jam(view.t)} · yang tampil hanya nama dan pencapaian</div>`}
  h+='<div class="pjb"><button class="opt spk" id="pjr">🔄 Segarkan</button></div><button class="opt go" id="x">Tutup</button>';
  c.innerHTML=h;
