@@ -1,0 +1,19 @@
+/* ===== Bagian 27: Papan Juara (leaderboard) =====
+   Dimuat setelah ringkas.css. Hanya tampilan; logika ada di js/27-papan-juara.js */
+#lbn{position:fixed;right:10px;top:calc(env(safe-area-inset-top,0px) + 134px);z-index:6;display:none;background:var(--sun);color:var(--ink);border:3px solid var(--ink);border-radius:999px;padding:4px 14px;font:700 16px 'Baloo 2',sans-serif;box-shadow:0 3px 0 var(--ink);cursor:pointer;touch-action:manipulation}
+#lbn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+#lbm{position:fixed;z-index:6;pointer-events:none;display:none}
+body.cc #lbn,body.cc #lbm{display:none!important}
+
+.pjr{display:grid;grid-template-columns:36px 1fr auto 52px;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:6px 6px;font-size:15px}
+.pjn{font-size:22px;text-align:center;line-height:1;font-weight:700}
+.pjm{min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.pjm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pjm small{opacity:.8;font-size:12px}
+.pjs{font-size:13px;white-space:nowrap;opacity:.9}
+.pjv{font-size:20px;font-weight:700;text-align:right}
+.pjr.me{background:#ffe985;border:2px solid var(--ink);border-radius:12px}
+.pjf{font-size:12px;opacity:.7;margin:8px 0 4px;text-align:center}
+.pjb{text-align:center;margin:6px 0 2px}
+@media (max-width:520px){.pjs{display:none}.pjr{grid-template-columns:34px 1fr 52px}}
+@media (max-width:520px){#lbn{top:calc(env(safe-area-inset-top,0px) + 112px)}}
