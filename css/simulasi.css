@@ -1,0 +1,12 @@
+/* ===== v45: warna lebih hidup + HUD panduan ringkas (dari kota-profesi-karakter-v40-sas) =====
+   Dimuat paling akhir. Hanya tampilan; tidak mengubah logika. */
+
+/* Warna kota tidak pucat. Selektor canvas#c dipakai supaya menang atas base.css (canvas#c) */
+canvas#c{filter:saturate(1.22) contrast(1.05) brightness(1.02)}
+
+/* Kartu panduan lebih ringkas, tidak ramai */
+#gc .gcp,#gc .gcs{display:none}
+@media (pointer:fine) and (min-width:901px){#gc.st .gcs{display:block}}
+#gc{padding:3px 10px}
+#gc b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#qt .sasq{display:none!important}
