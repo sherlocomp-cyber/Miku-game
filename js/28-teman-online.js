@@ -162,7 +162,7 @@ function frame(now){if(bad>8)return;requestAnimationFrame(frame);
 
 /* ---------- Tampilan: tombol 💬 + panel ---------- */
 const css=document.createElement('style');css.textContent=`
-#top{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(94vw,560px);max-height:64vh;overflow:auto;background:#fffaf0;color:#1d2b53;border:4px solid #1d2b53;border-radius:18px;padding:10px 12px;z-index:70;font-family:'Baloo 2',sans-serif;display:none;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+#top{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(94vw,560px);max-height:86vh;overflow:auto;background:#fffaf0;color:#1d2b53;border:4px solid #1d2b53;border-radius:18px;padding:10px 12px;z-index:70;font-family:'Baloo 2',sans-serif;display:none;box-shadow:0 6px 24px rgba(0,0,0,.35)}
 #top .th{display:flex;justify-content:space-between;align-items:center;font-size:18px}
 #top .th button{background:none;border:0;font-size:20px;cursor:pointer;color:#1d2b53}
 #top .tl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;font-size:14px}
@@ -178,7 +178,7 @@ const css=document.createElement('style');css.textContent=`
 #top .tn{font-size:12px;opacity:.85;margin-top:6px}`;
 document.head.appendChild(css);
 const pan=document.createElement('div');pan.id='top';pan.setAttribute('role','dialog');pan.setAttribute('aria-label','Teman online');
-pan.innerHTML='<div class="th"><b>💬 Teman online <span id="tocn"></span></b><button id="tox" type="button" aria-label="Tutup">✖</button></div><div class="tl" id="tol"></div><div class="tq" id="toq"></div><div class="ti" id="toi"><input id="tot" maxlength="'+MAXLEN+'" placeholder="Ketik pesan (maks. '+MAXLEN+' huruf)" autocomplete="off" enterkeyhint="send"><button id="tos" type="button">Kirim</button></div><div class="tn" id="ton"></div>';
+pan.innerHTML='<div class="th"><b>💬 Teman online <span id="tocn"></span></b><button id="tox" type="button" aria-label="Tutup">✖</button></div><div class="ti" id="toi"><input id="tot" maxlength="'+MAXLEN+'" placeholder="Ketik pesan (maks. '+MAXLEN+' huruf)" autocomplete="off" enterkeyhint="send"><button id="tos" type="button">Kirim</button></div><div class="tl" id="tol"></div><div class="tq" id="toq"></div><div class="tn" id="ton"></div>';
 document.body.appendChild(pan);
 ['keydown','keyup','keypress'].forEach(ev=>pan.addEventListener(ev,e=>e.stopPropagation()));
 ['keydown','keyup'].forEach(ev=>addEventListener(ev,e=>{if(pan.contains(e.target))e.stopImmediatePropagation()},true));
