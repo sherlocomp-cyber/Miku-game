@@ -6,6 +6,7 @@
    Tanpa internet: otomatis main sendiri melawan Kak Hud-hud.
    Data: /tali/<ruang>/m = {id,t,b,tg,dur} dan /tali/<ruang>/p/<id-perangkat> = {n,tm,c,mid,t,off}. Posisi tali = (tarikan A - tarikan B) / 8, dihitung lokal dari data yang sama (tanpa "host").
    Salah = tidak menarik, jeda 2,2 dtk + pembahasan (tidak ada pengurangan). Koin: +2 per jawaban benar, +40 menang (+60 menang pertama hari ini), +10 ikut. Tidak memanggil rec().
+   UX (v2): skor tim di sisi bar atas (nama pemain hanya di lobi/hasil), timmu bertanda kuning, hitung mundur menyebut timmu, keluar dengan 2x ketuk (tanpa confirm()), getar di HP.
    Cara balik ke tampilan lama: hapus baris <script> js/32 di index.html. */
 (function(){
 'use strict';
@@ -39,7 +40,7 @@ function lolos(t){t=String(t||'');
 const safe=n=>{n=String(n==null?'':n).replace(/[\u0000-\u001f\u007f<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,16);return n&&lolos(n)?n:'Teman'};
 
 /* ---------- Status ---------- */
-const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,G:null,flag:null,pa:[],pb:[],ow:null,org:null,o:null,sv:{try:0,win:0,best:0,d:''}};
+const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,qc:0,G:null,flag:null,pa:[],pb:[],ow:null,org:null,o:null,sv:{try:0,win:0,best:0,d:''}};
 const lsRead=()=>{try{return typeof lsg==='function'?lsg(SKT):localStorage.getItem(SKT)}catch(e){return null}};
 try{Object.assign(T.sv,jp(lsRead()||'{}')||{})}catch(e){}
 const persist=()=>{try{typeof lss==='function'?lss(SKT,JSON.stringify(T.sv)):localStorage.setItem(SKT,JSON.stringify(T.sv))}catch(e){}};
@@ -64,17 +65,16 @@ function calc(tr,now){
 /* ---------- Elemen layar ---------- */
 (function(){
   const css=document.createElement('style');css.textContent=`
-#tth,#tts,#ttq,#ttc{display:none}
-body.tli #tth,body.tli #tts{display:flex}
+#tth,#ttq,#ttc{display:none}
+body.tli #tth{display:flex}
 body.tli .hud,body.tli #js,body.tli #rbar{display:none!important}
 #tth{position:fixed;left:0;right:0;top:0;z-index:5;gap:8px;align-items:center;pointer-events:none;padding:calc(8px + env(safe-area-inset-top,0px)) calc(10px + env(safe-area-inset-right,0px)) 0 calc(10px + env(safe-area-inset-left,0px))}
 .ttp{font:700 15px/1 "Baloo 2",system-ui,sans-serif;background:#fffaf0;color:#1d2b53;border:3px solid #1d2b53;border-radius:999px;padding:7px 12px;pointer-events:auto;white-space:nowrap}
 button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .ttbar{flex:1;height:22px;border:3px solid #1d2b53;border-radius:999px;position:relative;overflow:hidden;background:linear-gradient(90deg,#2fa56b 50%,#f08a24 50%)}
 .ttbar i{position:absolute;top:-2px;bottom:-2px;left:50%;width:10px;margin-left:-5px;background:#fff;border:2px solid #1d2b53;border-radius:5px;transition:left .25s}
-#tts{position:fixed;left:0;right:0;top:calc(58px + env(safe-area-inset-top,0px));z-index:5;justify-content:space-between;gap:8px;padding:0 calc(10px + env(safe-area-inset-right,0px)) 0 calc(10px + env(safe-area-inset-left,0px));pointer-events:none;font:700 13px/1.25 "Baloo 2",system-ui,sans-serif}
-#tts div{background:rgba(255,250,240,.94);border:3px solid #1d2b53;border-radius:14px;padding:4px 10px;max-width:45vw;color:#1d2b53}
-#ttsa{border-color:#178a55!important}#ttsb{border-color:#b85c0a!important}
+#ttsa{border-color:#178a55}#ttsb{border-color:#b85c0a}
+.ttp.me{background:#fff;box-shadow:0 0 0 3px #ffcf3f}
 #ttq{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(8px + env(safe-area-inset-bottom,0px));width:min(96vw,720px);max-height:56vh;overflow:auto;z-index:6;background:#fffaf0;color:#1d2b53;border:4px solid #1d2b53;border-radius:18px;padding:10px 12px;font-family:"Baloo 2",system-ui,sans-serif}
 #ttq.on{display:block}
 .ttq1{font-size:clamp(16px,3.4vw,22px);font-weight:700;margin-bottom:8px;line-height:1.3}
@@ -88,19 +88,21 @@ button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .tto i{font-style:normal;background:#1d2b53;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-grid;place-items:center;font-size:13px;flex:none}
 .ttf{min-height:20px;margin-top:6px;font-size:14px}
 #ttc{position:fixed;inset:0;z-index:7;align-items:center;justify-content:center;pointer-events:none;text-align:center;font:800 min(22vw,150px)/1.05 "Baloo 2",system-ui,sans-serif;color:#fff;-webkit-text-stroke:6px #1d2b53;paint-order:stroke fill}
-#ttc.on{display:flex;animation:ttpop .45s ease-out}
+#ttc.on{display:flex;flex-direction:column;animation:ttpop .45s ease-out}
+#ttc small{font-size:.26em;-webkit-text-stroke:3px #1d2b53;margin-top:.3em}
 @keyframes ttpop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
 .ttg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 .ttcol{border:3px solid;border-radius:14px;padding:6px 10px;display:flex;flex-direction:column;gap:2px;font-size:15px;background:#fffaf0}
 .ttm{opacity:.7;font-size:13px}
-@media (max-height:420px){#ttq{max-height:60vh;padding:6px 10px}.ttq1{font-size:15px;margin-bottom:4px}.tto button{min-height:40px}#tts{top:calc(52px + env(safe-area-inset-top,0px));font-size:12px}}
+@media (max-height:420px){#ttq{max-height:60vh;padding:6px 10px}.ttq1{font-size:15px;margin-bottom:4px}.tto button{min-height:40px}#tth{gap:6px}.ttp{padding:5px 9px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){#ttc.on{animation:none}.ttbar i{transition:none}}`;
   document.head.appendChild(css);
   const w=document.createElement('div');
-  w.innerHTML='<div id="tth"><div class="ttp" id="ttt">⏱ 2:00</div><div class="ttbar" aria-hidden="true"><i id="ttm"></i></div><button class="ttp" id="ttx" type="button" aria-label="Keluar dari Tarik Tali">✖</button></div>'
-   +'<div id="tts"><div id="ttsa"></div><div id="ttsb"></div></div><div id="ttq" role="group" aria-label="Soal"></div><div id="ttc" aria-hidden="true"></div>';
+  w.innerHTML='<div id="tth"><div class="ttp" id="ttt">⏱ 2:00</div><div class="ttp" id="ttsa"></div><div class="ttbar" aria-hidden="true"><i id="ttm"></i></div><div class="ttp" id="ttsb"></div><button class="ttp" id="ttx" type="button" aria-label="Keluar dari Tarik Tali">✖</button></div>'
+   +'<div id="ttq" role="group" aria-label="Soal"></div><div id="ttc" role="status" aria-live="polite"></div>';
   while(w.firstChild)document.body.appendChild(w.firstChild);
   E.t=$('#ttt');E.m=$('#ttm');E.x=$('#ttx');E.a=$('#ttsa');E.b=$('#ttsb');E.q=$('#ttq');E.c=$('#ttc')})();
+const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};let qT=0;
 
 /* ---------- Arena 3D (dibangun sekali) ---------- */
 function mk(){
@@ -175,20 +177,24 @@ function begin(){
   T.sv.try=(T.sv.try||0)+1;persist();T.tp=performance.now();T.fx=0;T.mid='';T.my=0;T.fin=null;T.q=null;T.played=false;T.hk='';T.cdn='';
   connect()}
 function leave(){
-  const was=T.on;bye();T.on=false;T.ph='idle';clearTimeout(T.ct);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
+  const was=T.on;qreset();bye();T.on=false;T.ph='idle';clearTimeout(T.ct);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
   E.c.className='';E.q.className='';E.q.innerHTML='';
   if(was){
     const o=T.org;if(o){S.background=o.bg;S.fog.color.setHex(o.fc);S.fog.near=o.fn;S.fog.far=o.ff;cam.fov=o.fov;cam.updateProjectionMatrix()}
     if(T.G)T.G.visible=false;P.visible=true;
     if(T.o){pl.x=T.o.x;pl.y=0;pl.z=T.o.z;pl.yaw=T.o.yaw}pl.vy=0}
   document.body.classList.remove('tli');modal(false);open=false;mode=null}
-function quit(){if(!T.on)return;if(T.ph==='play'&&!confirm('Keluar dari pertandingan? Tarikanmu tetap dihitung untuk timmu.'))return;leave()}
+function qreset(){T.qc=0;clearTimeout(qT);E.x.textContent='✖';E.x.setAttribute('aria-label','Keluar dari Tarik Tali')}
+function quit(){if(!T.on)return;
+  if(T.ph!=='play'||T.qc){qreset();leave();return}
+  T.qc=1;E.x.textContent='Keluar? Ketuk lagi';E.x.setAttribute('aria-label','Ketuk sekali lagi untuk keluar. Tarikanmu tetap dihitung untuk timmu.');
+  qT=setTimeout(qreset,3200)}
 function conn(){const c=$('#card');modal(true);c.scrollTop=0;c.innerHTML='<h2>🪢 Menyambung…</h2><div class="fc">Mencari teman sekelas. Kalau tidak ada internet, kamu main melawan Kak Hud-hud.</div><div class="exbt"><button class="opt" id="ttq0" type="button">✖ Batal</button></div>';$('#ttq0').onclick=leave}
 function lobby(c){
-  const sg=JSON.stringify([c.L.a.map(x=>x.n),c.L.b.map(x=>x.n),T.net,c.m&&c.m.id,c.ended]);if(sg===T.ck)return;T.ck=sg;
+  const sg=JSON.stringify([c.L.a.map(x=>x.n),c.L.b.map(x=>x.n),T.net,c.m&&c.m.id,c.ended,T.tm]);if(sg===T.ck)return;T.ck=sg;
   const col=t=>`<div class="ttcol" style="border-color:${TC[t].h}"><b style="color:${TC[t].h}">${TC[t].e} ${TC[t].n} · ${c.L[t].length}</b>${c.L[t].map(x=>`<span>${esc(x.n)}${x.k===dev?' (kamu)':''}</span>`).join('')||'<span class="ttm">menunggu teman…</span>'}</div>`;
   const solo=c.na===0||c.nb===0,card=$('#card');modal(true);
-  card.innerHTML=`<h2>🪢 Lobi Tarik Tali</h2><div class="stp">${T.net?'☁️ Ruang '+esc(T.room.toUpperCase()):'📴 Main sendiri (tanpa internet)'}</div><div class="ttg">${col('a')}${col('b')}</div>`
+  card.innerHTML=`<h2>🪢 Lobi Tarik Tali</h2><div class="stp">${T.net?'☁️ Ruang '+esc(T.room.toUpperCase()):'📴 Main sendiri (tanpa internet)'}</div><div class="ttg">${col('a')}${col('b')}</div><div class="fc" style="text-align:center">Kamu di <b style="color:${TC[T.tm].h}">${TC[T.tm].e} ${TC[T.tm].n}</b></div>`
    +`<div class="fc">${solo?'Belum ada lawan manusia: <b>Kak Hud-hud 🦉</b> akan jadi lawanmu.':'Siapa saja boleh menekan Mulai. Semua pemain langsung ikut.'}</div>`
    +'<div class="exbt"><button class="opt go" id="ttgo" type="button">▶ Mulai pertandingan</button><button class="opt" id="ttno" type="button">✖ Keluar</button></div>';
   $('#ttgo').onclick=start;$('#ttno').onclick=leave;try{$('#ttgo').focus({preventScroll:true})}catch(e){}}
@@ -209,9 +215,9 @@ function pick(i){
   const q=T.q;if(!q||q.done||T.ph!=='play'||!T.c||T.c.el<0)return;q.done=true;const ok=i===q.c;
   E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;const k=+b.dataset.i;if(k===q.c)b.classList.add('ok');else if(k===i)b.classList.add('no')});
   const f=E.q.querySelector('.ttf');
-  if(ok){T.my++;coins+=2;hud();me();snd(988,.12,'triangle');T.pull=performance.now();
+  if(ok){T.my++;coins+=2;hud();me();snd(988,.12,'triangle');vib(20);T.pull=performance.now();
     f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Tarik! +1 💪</b>';T.nxt=performance.now()+900}
-  else{snd(180,.25,'sawtooth');
+  else{snd(180,.25,'sawtooth');vib([60,40]);
     f.innerHTML='<b style="color:#b8352b">🦉 Belum tepat.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';T.nxt=performance.now()+LOCKW+(q.ex?800:0)}}
 function finish(c){
   T.ph='end';T.fin=c;T.q=null;E.q.className='';E.q.innerHTML='';E.c.className='';
@@ -228,14 +234,15 @@ function finish(c){
    +'<div class="exbt"><button class="opt go" id="ttag" type="button">🔁 Main lagi</button><button class="opt" id="ttcl" type="button">✖ Tutup</button></div>';
   $('#ttag').onclick=()=>{modal(false);T.ph='lobby';T.ck='';T.cdn='';T.fin=null;const n=calc(T.tree,nowS());if(!n.m||n.ended)start()};
   $('#ttcl').onclick=leave;
-  if(won){confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
+  if(won){vib([40,40,40,40,120]);confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
 
 /* ---------- Per-frame ---------- */
 function hudUpd(c){
   const left=c.el<0?c.dur:Math.max(0,Math.ceil(c.dur-c.el));
-  const lst=t=>{const L=c.L[t],nm=L.slice(0,4).map(x=>esc(x.n)+(x.k===dev?'★':'')).join(', ')+(L.length>4?' +'+(L.length-4):'');return `<b>${TC[t].e} ${t==='a'?c.a:c.b}</b> ${nm}`+(t==='b'&&c.bot?' 🦉':'')};
-  const la=lst('a'),lb=lst('b'),sg=left+'|'+la+'|'+lb+'|'+c.pos;if(sg===T.hk)return;T.hk=sg;
-  E.t.textContent='⏱ '+fmt(left);E.m.style.left=(50-c.pos*50)+'%';E.a.innerHTML=la;E.b.innerHTML=lb}
+  const la=TC.a.e+' '+c.a,lb=c.b+' '+TC.b.e+(c.bot?' 🦉':''),sg=left+'|'+la+'|'+lb+'|'+c.pos+'|'+T.tm;if(sg===T.hk)return;T.hk=sg;
+  E.t.textContent='⏱ '+fmt(left);E.m.style.left=(50-c.pos*50)+'%';E.a.textContent=la;E.b.textContent=lb;
+  E.a.classList.toggle('me',T.tm==='a');E.b.classList.toggle('me',T.tm==='b');
+  E.a.setAttribute('aria-label',TC.a.n+' '+c.a+' tarikan'+(T.tm==='a'?', timmu':''));E.b.setAttribute('aria-label',TC.b.n+' '+c.b+' tarikan'+(T.tm==='b'?', timmu':''))}
 function tick(now){
   const c=T.c=calc(T.tree,nowS());
   if(T.joined&&now-T.hb>BEAT){T.hb=now;me()}
@@ -246,7 +253,7 @@ function tick(now){
   if(T.ph==='play'){
     if(c.ended){finish(c);return}
     const s=c.el<0?String(Math.ceil(-c.el)):(c.el<.9?'MULAI!':'');
-    if(s!==T.cdn){T.cdn=s;if(s){flash(s,0);snd(c.el<0?440:880,.12,'triangle')}else E.c.className=''}
+    if(s!==T.cdn){T.cdn=s;if(s){flash(s+(c.el<0?'<small>Kamu di '+TC[T.tm].e+' '+TC[T.tm].n+'</small>':''),0);snd(c.el<0?440:880,.12,'triangle')}else E.c.className=''}
     if(c.el>=0){
       if(T.q&&T.q.done&&now>=T.nxt)T.q=null;
       if(!T.q&&now>=T.nxt)ask()}
@@ -265,7 +272,7 @@ function frame(){
   const bo=c.bot?1:0;
   place(T.ow,0,1,-.35,!!bo);
   for(let i=0;i<MAXP;i++)place(T.pb[i],i+bo,1,-.35,i<c.nb&&i+bo<MAXP);
-  cam.position.set(0,7.5,TZ+30);cam.lookAt(0,-1.5,TZ);
+  cam.position.set(0,8,TZ+30);cam.lookAt(0,-3.5,TZ);
   P.position.set(pl.x,pl.y,pl.z)}
 const R0=R.render;
 R.render=function(s,c){
