@@ -1,19 +1,21 @@
-/* === BAGIAN 31 (v3): Arena Lampu Ilmu — Lomba Pasangan Kata, 2–4 pemain ===
+/* === BAGIAN 31 (v4): Arena Lampu Ilmu — Lomba Pasangan Kata, 2–8 pemain ===
    Menggantikan v2 (lampu hijau/merah). Riwayat lama ada di git. Pasangan: css/arena.css (tidak dipakai lagi; CSS baru ada di dalam berkas ini).
    Aturan: tiap ronde (4,6 dtk) muncul pasangan Arab–Indonesia. Pasangan BENAR = boleh maju (tahan LARI). Pasangan SALAH = harus diam;
    kalau tetap bergerak setelah jeda 0,9 dtk -> terpeleset ke pos terakhir, -1 hati. Pasangan sama untuk semua pemain (dari seed + jam server).
    Jalur 260 m, 3 pos (25/50/75%) sebagai titik kembali. Hati 3; habis = tersingkir (menonton). Selesai: peringkat + bonus koin.
-   Bareng: ruang = kelas dari akhir nama + nomor Regu (1-6), Firebase REST + EventSource (seperti js/28 & js/32), maks 4 pemain per regu, min 2.
-   Data: /lampu/<ruang>/m = {id,t,seed,pl:[id-perangkat]} dan /lampu/<ruang>/p/<id-perangkat> = {n,z(dm),h,f(dtk*10),mid,t,off}.
-   Tanpa internet / sendirian: tombol "Latihan sendiri". Aturan Firebase: "lampu":{"$ruang":{".read":true,".write":true}} (isi bebas seperti /tali).
+   Mode (dipilih di lobi): "solo" = tiap pemain lomba sendiri (2-8 orang); "duo" = berpasangan, tim 2 orang (4/6/8 pemain, genap).
+   Tim duo = pemain urutan 1-2, 3-4, dst (urutan id perangkat, sama di semua layar); skor tim = rata-rata jarak; tim selesai bila kedua anggota sampai finis (waktu = yang terakhir).
+   Bareng: ruang = kelas dari akhir nama + nomor Regu (1-6), Firebase REST + EventSource (seperti js/28 & js/32), maks 8 pemain per regu, min 2.
+   Data: /lampu/<ruang>/m = {id,t,seed,pl:[id-perangkat],md:'solo'|'duo'} dan /lampu/<ruang>/p/<id-perangkat> = {n,z(dm),h,f(dtk*10),mid,t,off}.
+   Tanpa internet / sendirian: tombol "Latihan sendiri". Aturan Firebase: lihat blok "lampu" (isi bebas seperti /tali).
    Kembali ke tampilan lama: kembalikan berkas ini dari riwayat git. */
 (function(){
 'use strict';
 if(window.ARN)return;
 if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||typeof P==='undefined'||typeof pl==='undefined'||typeof cam==='undefined'||typeof D==='undefined'){console.warn('Arena: modul pendukung belum siap');return}
 const DB='https://miku-profesi-default-rtdb.asia-southeast1.firebasedatabase.app';
-const AZ=-1800,LEN=260,LW=3.6,SP=6.2,CD=4,RD=4.6,SHOW=3.8,GR=.9,DUR=300,STALE=20000,BEAT=5000,MAXP=4,STUN=1.3;
-const LC=['#e0524a','#3d82e0','#2fa56b','#e0a43a'],LH=[0xe0524a,0x3d82e0,0x2fa56b,0xe0a43a];
+const AZ=-1800,LEN=260,LW=2.6,SP=6.2,CD=4,RD=4.6,SHOW=3.8,GR=.9,DUR=300,STALE=20000,BEAT=5000,MAXP=8,STUN=1.3;
+const LC=['#e0524a','#3d82e0','#2fa56b','#e0a43a','#9b6bd6','#2fb5b0','#e86ca0','#6b7a4a'],LH=[0xe0524a,0x3d82e0,0x2fa56b,0xe0a43a,0x9b6bd6,0x2fb5b0,0xe86ca0,0x6b7a4a];
 const SVT={'.sv':'timestamp'},RM=matchMedia('(prefers-reduced-motion:reduce)').matches,ARX=/[\u0600-\u06FF]/;
 const SKA=SK+':arena';
 const jp=t=>{try{return JSON.parse(t)}catch(e){return null}};
@@ -21,6 +23,7 @@ const num=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.max(a,Math.min(b,v)):(d||0)};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+const dm=c=>!!(c&&c.m&&c.m.md==='duo'),ci=(c,i)=>dm(c)?i>>1:i;
 let dev=null;try{dev=localStorage.getItem('kp.dev')}catch(e){}
 if(!dev){dev=Math.random().toString(36).slice(2,10);try{localStorage.setItem('kp.dev',dev)}catch(e){}}
 const NMX=()=>{try{return String(typeof NM!=='undefined'?NM:'').trim()}catch(e){return ''}};
@@ -36,7 +39,7 @@ function pairAt(seed,r){const g=rng(seed+'|'+r),n=VOC.length,i=(g()*n)|0,ok=g()<
  return{a:VOC[i][0],b:VOC[ok?i:j][1],ok,ta:VOC[i][1]}}
 
 /* ---------- Status ---------- */
-const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,mid:'',c:null,hb:0,zs:0,tp:0,rd:-9,pr:null,rv:0,lane:0,ck:'',qc:0,G:null,rn:[],crowd:[],cl:[],board:null,head:null,org:null,o:null,shake:0,regu:1,cheer:0,solo:false,sv:{try:0,win:0,best:0,bt:0,d:'',regu:1}};
+const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,mid:'',c:null,hb:0,zs:0,tp:0,rd:-9,pr:null,rv:0,lane:0,ck:'',qc:0,G:null,rn:[],crowd:[],cl:[],board:null,head:null,org:null,o:null,shake:0,regu:1,cheer:0,solo:false,md:'solo',sv:{try:0,win:0,best:0,bt:0,d:'',regu:1}};
 const L={z:0,v:0,h:3,cp:0,st:0,f:0,run:false,kd:false,miss:[]};
 try{Object.assign(T.sv,JSON.parse(lsg(SKA)||'{}'))}catch(e){}
 const persist=()=>{try{lss(SKA,JSON.stringify(T.sv))}catch(e){}};
@@ -65,8 +68,8 @@ body.lpa .hud,body.lpa #js,body.lpa #rbar{display:none!important}
 .lpp{font:700 15px/1 "Baloo 2",system-ui,sans-serif;background:#fffaf0;color:#1d2b53;border:3px solid #1d2b53;border-radius:999px;padding:7px 12px;pointer-events:auto;white-space:nowrap}
 button.lpp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .lpbar{flex:1;height:22px;border:3px solid #1d2b53;border-radius:999px;position:relative;background:linear-gradient(90deg,#e9d9a6,#f4e8c0);overflow:visible}
-.lpbar .d{position:absolute;top:-5px;width:20px;height:20px;margin-left:-10px;border:3px solid #1d2b53;border-radius:50%;transition:left .3s}
-.lpbar .d.me{width:26px;height:26px;margin-left:-13px;top:-8px;box-shadow:0 0 0 3px #ffcf3f}
+.lpbar .d{position:absolute;top:-2px;width:14px;height:14px;margin-left:-7px;border:3px solid #1d2b53;border-radius:50%;transition:left .3s}
+.lpbar .d.me{width:24px;height:24px;margin-left:-12px;top:-7px;box-shadow:0 0 0 3px #ffcf3f;z-index:2}
 .lpbar .fl{position:absolute;right:-6px;top:-12px;font-size:22px}
 #lpb{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top,0px));z-index:5;width:min(92vw,560px);pointer-events:none;text-align:center;font-family:"Baloo 2",system-ui,sans-serif}
 #lpb .w{display:flex;align-items:center;justify-content:center;gap:10px;background:#1d2b53;border:4px solid #fffaf0;border-radius:22px;padding:8px 12px;box-shadow:0 4px 0 rgba(0,0,0,.25)}
@@ -83,7 +86,7 @@ button.lpp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 #lpc small{font-size:.4em;-webkit-text-stroke:3px #1d2b53;margin-top:.3em}
 @keyframes lppop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
 .lpl{display:flex;align-items:center;gap:8px;font:700 16px "Baloo 2",system-ui,sans-serif;padding:4px 0}.lpl i{width:16px;height:16px;border-radius:50%;border:3px solid #1d2b53;flex:none}
-.lpk{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.lpk button{min-width:44px;min-height:44px;border:3px solid #1d2b53;border-radius:12px;background:#fff;font:800 18px "Baloo 2",system-ui,sans-serif;cursor:pointer}.lpk button.on{background:#ffcf3f}
+.lpk{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.lpk button{min-width:44px;min-height:44px;border:3px solid #1d2b53;border-radius:12px;background:#fff;font:800 16px "Baloo 2",system-ui,sans-serif;cursor:pointer;padding:4px 12px}.lpk button.on{background:#ffcf3f}
 @media (max-height:420px){#lpb{top:calc(54px + env(safe-area-inset-top,0px))}#lpb .c{min-height:40px}#lprun{width:96px;height:96px}.lpp{padding:5px 9px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){#lpc.on{animation:none}.lpbar .d{transition:none}}`;
   document.head.appendChild(css);
@@ -113,22 +116,22 @@ function drawBoard(g,w,h){
     g.fillText(k?pr.b:pr.a,x+(w/2-100)/2,54+(h-150)/2)});
   g.direction='ltr';g.fillStyle='#fff';g.font=fnt(0,130);g.fillText(rv>0?'=':rv<0?'≠':'?',w/2,h*.4);
   g.font=fnt(0,56);g.fillText(rv>0?'✔ BENAR — MAJU!':rv<0?'✖ SALAH — DIAM!':'Cocokkah? Benar: LARI · Salah: DIAM',w/2,h-52)}
-function drawGate(i){return(g,w,h)=>{g.fillStyle=LC[i%4];g.fillRect(0,0,w,h);g.fillStyle='#fffdf5';g.strokeStyle='#1d2b53';g.lineWidth=8;rr(g,14,14,w-28,h-28,26);g.fill();g.stroke();
+function drawGate(i){return(g,w,h)=>{g.fillStyle=LC[i%8];g.fillRect(0,0,w,h);g.fillStyle='#fffdf5';g.strokeStyle='#1d2b53';g.lineWidth=8;rr(g,14,14,w-28,h-28,26);g.fill();g.stroke();
   g.fillStyle='#1d2b53';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';g.font=fnt(1,84);g.fillText('مَحَطَّةٌ',w/2,h*.38);g.direction='ltr';g.font=fnt(0,52);g.fillText('Pos '+(i+1)+'/3 · titik aman',w/2,h*.74)}}
 const drawTxt=(a,b,col)=>(g,w,h)=>{g.fillStyle=col;g.fillRect(0,0,w,h);g.fillStyle='#fffdf5';rr(g,8,8,w-16,h-16,18);g.fill();g.fillStyle='#1d2b53';g.textAlign='center';g.textBaseline='middle';
   if(a){g.direction='rtl';g.font=fnt(1,Math.round(h*.4));g.fillText(a,w/2,h*.34)}g.direction='ltr';g.font=fnt(0,Math.round(h*(a?.3:.5)));g.fillText(b,w/2,h*(a?.74:.52))};
 
 /* ---------- Arena 3D (dibangun sekali) ---------- */
 function mkRunner(col){
-  const g=new THREE.Group(),L3=c=>new THREE.MeshLambertMaterial({color:c}),part=(w,h,d,c,x,y,z,p)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),L3(c));m.position.set(x,y,z);(p||g).add(m);return m};
-  part(1.2,1.5,.7,col,0,2.5,0);part(1.25,.5,.75,0x1d2b53,0,1.65,0);
+  const g=new THREE.Group(),cm=[],L3=c=>new THREE.MeshLambertMaterial({color:c}),part=(w,h,d,c,x,y,z,p)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),L3(c));m.position.set(x,y,z);(p||g).add(m);return m};
+  cm.push(part(1.2,1.5,.7,col,0,2.5,0).material);part(1.25,.5,.75,0x1d2b53,0,1.65,0);
   const hd=new THREE.Mesh(new THREE.SphereGeometry(.6,12,10),L3(0xf1c9a0));hd.position.y=3.75;g.add(hd);
-  const cp=new THREE.Mesh(new THREE.SphereGeometry(.64,12,8,0,Math.PI*2,0,Math.PI/2),L3(col));cp.position.y=3.85;g.add(cp);
-  const mk=(x,y,hh)=>{const p=new THREE.Group();p.position.set(x,y,0);g.add(p);part(.38,hh,.38,x?0xf1c9a0:0xf1c9a0,0,-hh/2,0,p);return p};
+  const cp=new THREE.Mesh(new THREE.SphereGeometry(.64,12,8,0,Math.PI*2,0,Math.PI/2),L3(col));cp.position.y=3.85;g.add(cp);cm.push(cp.material);
+  const mk=(x,y,hh)=>{const p=new THREE.Group();p.position.set(x,y,0);g.add(p);part(.38,hh,.38,0xf1c9a0,0,-hh/2,0,p);return p};
   const aL=mk(-.8,3.1,1.3),aR=mk(.8,3.1,1.3),lL=mk(-.32,1.5,1.5),lR=mk(.32,1.5,1.5);
-  lL.children[0].material=L3(0xf1c9a0);const tg=document.createElement('canvas');tg.width=256;tg.height=64;
+  const tg=document.createElement('canvas');tg.width=256;tg.height=64;
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(tg),transparent:true,depthTest:false,fog:false}));sp.scale.set(4.6,1.15,1);sp.position.y=5.3;sp.renderOrder=20;g.add(sp);
-  g.scale.setScalar(.85);g.visible=false;return{g,aL,aR,lL,lR,sp,tg,nm:'',z:AZ,v:0}}
+  g.scale.setScalar(.85);g.visible=false;return{g,aL,aR,lL,lR,sp,tg,cm,tc:'',nm:'',z:AZ,v:0}}
 function setTag(r,t,col){const g=r.tg.getContext('2d');g.clearRect(0,0,256,64);g.fillStyle=col;rr(g,4,6,248,52,26);g.fill();g.strokeStyle='#1d2b53';g.lineWidth=5;g.stroke();
   g.fillStyle='#fff';g.font=fnt(0,32);g.textAlign='center';g.textBaseline='middle';g.fillText(t,128,34);r.sp.material.map.needsUpdate=true;r.nm=t}
 function mk(){
@@ -136,18 +139,18 @@ function mk(){
   const G=T.G=new THREE.Group();G.visible=false;S.add(G);
   const L3=c=>new THREE.MeshLambertMaterial({color:c});
   const bx=(g,w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),L3(c));m.position.set(x,y,z);g.add(m);return m};
-  const ZC=AZ-LEN/2,TW=LW*4,Z0=AZ+3,Z1=AZ-LEN;
+  const ZC=AZ-LEN/2,TW=LW*MAXP,Z0=AZ+3,Z1=AZ-LEN;
   bx(G,700,2,760,0x7fc65a,0,-1.3,ZC-20);bx(G,TW+2.4,.5,LEN+60,0xffffff,0,-.4,ZC-8);bx(G,TW,.6,LEN+56,0xc4663f,0,-.35,ZC-8);
-  for(let k=0;k<=4;k++)bx(G,.25,.05,LEN+40,0xffffff,(k-2)*LW,.0,ZC-8);
-  for(let i=0;i<4;i++){bx(G,LW-.5,.06,3,LH[i],(i-1.5)*LW,.04,AZ+1);const sg=mkSign(2.4,1.2,128,64,drawTxt('',String(i+1),LC[i]));sg.m.rotation.x=-Math.PI/2;sg.m.position.set((i-1.5)*LW,.1,AZ-1.5);G.add(sg.m)}
+  for(let k=0;k<=MAXP;k++)bx(G,.2,.05,LEN+40,0xffffff,(k-MAXP/2)*LW,.0,ZC-8);
+  for(let i=0;i<MAXP;i++){bx(G,LW-.4,.06,3,LH[i],(i-(MAXP-1)/2)*LW,.04,AZ+1);const sg=mkSign(1.7,.9,128,64,drawTxt('',String(i+1),LC[i]));sg.m.rotation.x=-Math.PI/2;sg.m.position.set((i-(MAXP-1)/2)*LW,.1,AZ-1.5);G.add(sg.m)}
   /* penanda jarak tiap 20 m */
   for(let d=20;d<LEN;d+=20){[-1,1].forEach(s=>{bx(G,.3,2.2,.3,0x5a3a1c,s*(TW/2+1.2),1.1,AZ-d);const sg=mkSign(3,1.5,192,96,drawTxt('',d+' m','#3d82e0'));sg.m.position.set(s*(TW/2+1.2),2.6,AZ-d);sg.m.rotation.y=-s*.6;G.add(sg.m)})}
   /* gerbang start, pos, garis finis */
-  const arch=(z,col,sgn,y)=>{const g=new THREE.Group();g.position.z=z;G.add(g);[-1,1].forEach(s=>bx(g,1,9,1,0x5a3a1c,s*(TW/2+.6),4.5,0));bx(g,TW+3,1.2,1.2,col,0,9.4,0);if(sgn){sgn.m.position.set(0,12.4,.7);g.add(sgn.m)}return g};
+  const arch=(z,col,sgn)=>{const g=new THREE.Group();g.position.z=z;G.add(g);[-1,1].forEach(s=>bx(g,1,9,1,0x5a3a1c,s*(TW/2+.6),4.5,0));bx(g,TW+3,1.2,1.2,col,0,9.4,0);if(sgn){sgn.m.position.set(0,12.4,.7);g.add(sgn.m)}return g};
   arch(Z0,0x2fa56b,mkSign(10,4.2,512,208,drawTxt('اِبْدَأْ','START','#2fa56b')));
   for(let i=0;i<3;i++)arch(AZ-LEN*(i+1)/4,LH[i],mkSign(10,4.5,512,256,drawGate(i)));
   arch(Z1,0x1d2b53,mkSign(12,4.2,512,180,drawTxt('نِهَايَةٌ','FINISH 🏁','#1d2b53')));
-  for(let i=0;i<14;i++)for(let j=0;j<2;j++)bx(G,TW/14,.05,1,(i+j)%2?0xffffff:0x1d2b53,-TW/2+TW/28+i*TW/14,.06,Z1-.5-j);
+  for(let i=0;i<20;i++)for(let j=0;j<2;j++)bx(G,TW/20,.05,1,(i+j)%2?0xffffff:0x1d2b53,-TW/2+TW/40+i*TW/20,.06,Z1-.5-j);
   /* tribun + penonton bersorak */
   const rows=[0xd9594c,0x3d82e0,0xe0a43a],fc=[0xff6b5e,0xffcf3f,0x2fbf85,0x3d9bff,0xb06bff],hg=new THREE.SphereGeometry(.5,8,6);
   [-1,1].forEach(s=>rows.forEach((c,r)=>{const h=1.2+r*1.2;bx(G,5,h,LEN+30,c,s*(TW/2+5+r*5),h/2,ZC-8)}));
@@ -193,11 +196,12 @@ function modal(on){$('#modal').style.display=on?'flex':'none'}
 function intro(){
   if(open||!ready||T.on)return;
   open=true;mode='arena';const c=$('#card'),s=T.sv;modal(true);c.scrollTop=0;T.regu=num(s.regu,1,6,1);
-  c.innerHTML='<h2>🚦 Arena Lampu Ilmu</h2><div class="fc">Lomba lari <b>2–4 pemain</b> di jalur 260 m! Di papan Kak Hud-hud muncul <b>pasangan kata Arab–Indonesia</b>. Pasangan <b>BENAR → LARI</b>. Pasangan <b>SALAH → DIAM</b>.</div>'
+  c.innerHTML='<h2>🚦 Arena Lampu Ilmu</h2><div class="fc">Lomba lari <b>2–8 pemain</b> di jalur 260 m! Di papan Kak Hud-hud muncul <b>pasangan kata Arab–Indonesia</b>. Pasangan <b>BENAR → LARI</b>. Pasangan <b>SALAH → DIAM</b>.</div>'
    +`<div class="exst"><div><b>${s.win||0}</b><small>kali juara 1</small></div><div><b>${s.bt?fmt(s.bt):'—'}</b><small>waktu terbaik</small></div><div><b>${s.try||0}</b><small>kali main</small></div></div>`
    +'<div class="exrw"><b>🟰</b><span><b>Cocok?</b> Contoh: <span class="ar" lang="ar">فَلَّاحٌ</span> = petani → benar, tahan tombol LARI.</span></div>'
    +'<div class="exrw"><b>≠</b><span><b>Tidak cocok?</b> Lepas tombol! Kalau masih bergerak, kamu terpeleset ke pos terakhir dan kehilangan ❤️.</span></div>'
-   +'<div class="exrw"><b>🚩</b><span><b>3 pos aman</b> di jalur. Hati habis = tersingkir. Sampai garis finis lebih dulu = juara!</span></div>'
+   +'<div class="exrw"><b>👫</b><span><b>Dua mode</b> (dipilih di lobi): <b>Sendiri-sendiri</b> (2–8 orang, juara perorangan) atau <b>Berpasangan</b> (tim 2 orang, 4/6/8 pemain; tim menang kalau keduanya sampai finis lebih dulu).</span></div>'
+   +'<div class="exrw"><b>🚩</b><span><b>3 pos aman</b> di jalur. Hati habis = tersingkir.</span></div>'
    +'<div class="gt">Pilih Regu (sama dengan temanmu)</div><div class="lpk" id="lpk">'+[1,2,3,4,5,6].map(n=>`<button type="button" data-r="${n}" class="${n===T.regu?'on':''}">${n}</button>`).join('')+'</div>'
    +'<div class="exbt"><button class="opt go" id="lpg1" type="button">▶ Masuk lobi</button><button class="opt" id="lpg0" type="button">✖ Nanti saja</button></div>';
   $('#lpk').onclick=e=>{const b=e.target.closest('button');if(!b)return;T.regu=+b.dataset.r;$('#lpk').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};
@@ -219,50 +223,58 @@ function qreset(){T.qc=0;clearTimeout(qT);E.x.textContent='✖'}
 function quit(){if(!T.on)return;if(T.ph!=='play'||T.qc){qreset();leave();return}T.qc=1;E.x.textContent='Keluar? Ketuk lagi';qT=setTimeout(qreset,3200)}
 function conn(){const c=$('#card');modal(true);c.scrollTop=0;c.innerHTML='<h2>🚦 Menyambung…</h2><div class="fc">Mencari temanmu di Regu '+T.regu+'. Tanpa internet, kamu bisa Latihan sendiri.</div><div class="exbt"><button class="opt" id="lpq0" type="button">✖ Batal</button></div>';$('#lpq0').onclick=leave}
 function lobby(c){
-  const others=c.act.filter(k=>k!==dev).length,run=c.m&&!c.ended,mine=c.ids.includes(dev);
-  const sg=JSON.stringify([c.act.map(k=>c.pp[k].n),T.net,c.m&&c.m.id,c.ended]);if(sg===T.ck)return;T.ck=sg;
-  const rows=c.act.slice(0,MAXP).map((k,i)=>`<div class="lpl"><i style="background:${LC[i]}"></i>${esc(String(c.pp[k].n||'Teman').slice(0,14))}${k===dev?' (kamu)':''}</div>`).join('');
-  const full=others>=MAXP,ok=c.act.length>=2&&c.act.length<=MAXP&&!run,card=$('#card');modal(true);
-  card.innerHTML=`<h2>🚦 Lobi Regu ${T.regu}</h2><div class="stp">${T.net?'☁️ Ruang '+esc(T.room.toUpperCase()):'📴 Tanpa internet'} · ${Math.min(c.act.length,MAXP)}/${MAXP} pemain</div>`+rows
-   +(full?'<div class="fc">Regu ini sudah penuh (maks 4). Pilih Regu lain.</div>':run&&!mine?'<div class="fc">Lomba sedang berjalan. Tunggu sampai selesai, ya.</div>':c.act.length<2?'<div class="fc">Minimal <b>2 pemain</b>. Ajak temanmu masuk <b>Regu '+T.regu+'</b>.</div>':'<div class="fc">Siapa saja boleh menekan Mulai. Semua pemain langsung ikut!</div>')
+  const others=c.act.filter(k=>k!==dev).length,run=c.m&&!c.ended,mine=c.ids.includes(dev),duo=T.md==='duo',na=c.act.length;
+  const sg=JSON.stringify([c.act.map(k=>c.pp[k].n),T.net,c.m&&c.m.id,c.ended,T.md]);if(sg===T.ck)return;T.ck=sg;
+  const rows=c.act.slice(0,MAXP).map((k,i)=>`<div class="lpl"><i style="background:${LC[duo?i>>1:i]}"></i>${duo?'Tim '+((i>>1)+1)+' · ':''}${esc(String(c.pp[k].n||'Teman').slice(0,14))}${k===dev?' (kamu)':''}</div>`).join('');
+  const full=others>=MAXP,bad=duo&&(na%2||na<4),ok=!run&&na>=2&&na<=MAXP&&!bad,card=$('#card');modal(true);
+  card.innerHTML=`<h2>🚦 Lobi Regu ${T.regu}</h2><div class="stp">${T.net?'☁️ Ruang '+esc(T.room.toUpperCase()):'📴 Tanpa internet'} · ${Math.min(na,MAXP)}/${MAXP} pemain</div>`
+   +`<div class="lpk" id="lpm"><button type="button" data-m="solo" class="${duo?'':'on'}">🏃 Sendiri-sendiri</button><button type="button" data-m="duo" class="${duo?'on':''}">👫 Berpasangan</button></div>`+rows
+   +(full?'<div class="fc">Regu ini sudah penuh (maks 8). Pilih Regu lain.</div>':run&&!mine?'<div class="fc">Lomba sedang berjalan. Tunggu sampai selesai, ya.</div>':bad&&na>=2?'<div class="fc">Mode berpasangan butuh jumlah pemain <b>genap</b> (4, 6, atau 8). Tim dibentuk berurutan sesuai daftar.</div>':na<2?'<div class="fc">Minimal <b>2 pemain</b>. Ajak temanmu masuk <b>Regu '+T.regu+'</b>.</div>':'<div class="fc">Siapa saja boleh menekan Mulai. Semua pemain langsung ikut!</div>')
    +'<div class="exbt">'+(full?'':`<button class="opt go" id="lpgo" type="button" ${ok?'':'disabled'}>▶ Mulai lomba</button>`)+'<button class="opt" id="lpso" type="button">🏃 Latihan sendiri</button><button class="opt" id="lpno" type="button">✖ Keluar</button></div>';
-  const g=$('#lpgo');if(g)g.onclick=()=>start(false);$('#lpso').onclick=()=>start(true);$('#lpno').onclick=leave}
-function start(solo){
+  $('#lpm').onclick=e=>{const b=e.target.closest('button');if(!b)return;T.md=b.dataset.m;T.ck=''};
+  const g=$('#lpgo');if(g)g.onclick=()=>start(T.md==='duo'?'duo':'race');$('#lpso').onclick=()=>start('prak');$('#lpno').onclick=leave}
+function start(kind){
   const c=calc(T.tree,nowS());if(c.m&&!c.ended&&c.ids.includes(dev))return;
-  const ids=solo?[dev]:c.act.slice(0,MAXP);if(!solo&&(ids.length<2||!ids.includes(dev)))return;
-  if(solo&&c.m&&!c.ended)return;
-  const id=Math.random().toString(36).slice(2,8),seed=Math.random().toString(36).slice(2,8);T.solo=solo;
-  put('m',t=>({id,t,seed,pl:ids}));
-  if(solo){T.net=false}}
+  const pr=kind==='prak',duo=kind==='duo',ids=pr?[dev]:c.act.slice(0,MAXP);
+  if(!pr&&(ids.length<2||!ids.includes(dev)))return;
+  if(duo&&(ids.length%2||ids.length<4))return;
+  if(pr&&c.m&&!c.ended)return;
+  const id=Math.random().toString(36).slice(2,8),seed=Math.random().toString(36).slice(2,8),md=duo?'duo':'solo';T.solo=pr;
+  put('m',t=>({id,t,seed,pl:ids,md}));
+  if(pr){T.net=false}}
 function enterPlay(c){
   T.mid=c.m.id;T.ph='play';T.rd=-9;T.pr=null;T.rv=0;T.lane=Math.max(0,c.ids.indexOf(dev));resetL();modal(false);document.body.classList.add('lpr');me();T.zs=0;
-  c.ids.forEach((k,i)=>{const r=T.rn[i];if(r){r.z=AZ;r.v=0;r.nm='';r.g.rotation.z=0}});E.he.textContent=hearts();
-  E.bar.querySelectorAll('.d').forEach(d=>d.remove());c.ids.forEach((k,i)=>{const d=document.createElement('i');d.className='d'+(k===dev?' me':'');d.style.background=LC[i];d.style.left='0%';E.bar.appendChild(d)})}
+  c.ids.forEach((k,i)=>{const r=T.rn[i];if(r){r.z=AZ;r.v=0;r.nm='';r.g.rotation.z=0;r.tc=LC[ci(c,i)];r.cm.forEach(m=>m.color.setHex(LH[ci(c,i)]))}});E.he.textContent=hearts();
+  E.bar.querySelectorAll('.d').forEach(d=>d.remove());c.ids.forEach((k,i)=>{const d=document.createElement('i');d.className='d'+(k===dev?' me':'');d.style.background=LC[ci(c,i)];d.style.left='0%';E.bar.appendChild(d)})}
 function caught(pr){
   L.h--;L.st=STUN;L.z=L.cp;L.v=0;T.shake=.5;snd(160,.35,'sawtooth',.08);vib([90,50,90]);E.he.textContent=hearts();
   if(!L.miss.some(m=>m.a===pr.a))L.miss.push(pr);me();
   flash(L.h>0?'😵‍💫 Pasangan salah, tapi kamu bergerak!<br><small>Kembali ke pos terakhir</small>':'😵‍💫 Hatimu habis!',1)}
-function finishRun(c){L.f=Math.max(1,Math.round(c.el*10));L.v=0;T.cheer=performance.now();snd(988,.2,'triangle');vib([40,40,40,40,120]);confetti();me();flash('🏁 Kamu sampai garis finis!<br><small>Menunggu pemain lain…</small>',1)}
-function rank(c){return c.ids.map(k=>{const d=c.pp[k]||{},me_=k===dev;return{k,n:me_?nm():String(d.n||'Teman').slice(0,14),z:me_?L.z:num(d.z,0,9999,0)/10,f:(me_?L.f:num(d.f,0,99999,0))/10,h:me_?L.h:num(d.h,0,3,0),mine:me_}})
-  .sort((a,b)=>(b.f>0)-(a.f>0)||(a.f>0&&b.f>0?a.f-b.f:b.z-a.z))}
+function finishRun(c){L.f=Math.max(1,Math.round(c.el*10));L.v=0;T.cheer=performance.now();snd(988,.2,'triangle');vib([40,40,40,40,120]);confetti();me();flash('🏁 Kamu sampai garis finis!<br><small>'+(dm(c)?'Menunggu pasanganmu…':'Menunggu pemain lain…')+'</small>',1)}
+function groups(c){
+  const duo=dm(c),per=c.ids.map(k=>{const d=c.pp[k]||{},m=k===dev;return{k,n:m?nm():String(d.n||'Teman').slice(0,14),z:m?L.z:num(d.z,0,9999,0)/10,f:(m?L.f:num(d.f,0,99999,0))/10,h:m?L.h:num(d.h,0,3,0),mine:m}});
+  const gs=[];per.forEach((x,i)=>{if(duo&&i%2&&gs.length)gs[gs.length-1].m.push(x);else gs.push({m:[x],ci:duo?i>>1:i})});
+  gs.forEach(g=>{g.n=g.m.map(x=>x.n).join(' & ');g.z=g.m.reduce((s,x)=>s+x.z,0)/g.m.length;g.f=g.m.every(x=>x.f>0)?Math.max(...g.m.map(x=>x.f)):0;g.h=Math.max(...g.m.map(x=>x.h));g.mine=g.m.some(x=>x.mine)});
+  return gs.sort((a,b)=>(b.f>0)-(a.f>0)||(a.f>0&&b.f>0?a.f-b.f:b.z-a.z))}
 function endCard(c){
   T.ph='end';document.body.classList.remove('lpr');E.c.className='';E.b.innerHTML='';
-  const rk=rank(c),pos=rk.findIndex(x=>x.mine),me_=rk[pos]||{f:0},fin=me_.f>0,s=T.sv,first=s.d!==dstr(),n=rk.length;
-  let b=10;if(fin){b+=50+[30,20,10,0][pos];if(rk.every(x=>x.f>0)&&n>1)b+=20;s.best=s.best||0;if(!s.bt||me_.f<s.bt)s.bt=me_.f;if(pos===0&&n>1){s.win=(s.win||0)+1;if(first){b+=60;s.d=dstr()}}}
+  const rk=groups(c),duo=dm(c),pos=Math.max(0,rk.findIndex(x=>x.mine)),g0=rk[pos]||{f:0},fin=g0.f>0,s=T.sv,first=s.d!==dstr(),n=rk.length;
+  let b=10;if(fin){b+=50+([30,20,10][pos]||0);if(rk.every(x=>x.f>0)&&n>1)b+=20;if(!s.bt||g0.f<s.bt)s.bt=g0.f;if(pos===0&&n>1){s.win=(s.win||0)+1;if(first){b+=60;s.d=dstr()}}}
   persist();coins+=b;hud();
-  const med=['🥇','🥈','🥉','4️⃣'],card=$('#card');modal(true);card.scrollTop=0;
-  const rows=rk.map((x,i)=>`<div class="lpl" style="${x.mine?'background:#fff3c4;border-radius:10px;padding:4px 8px':''}"><span>${med[i]}</span><i style="background:${LC[c.ids.indexOf(x.k)%4]}"></i><span style="flex:1">${esc(x.n)}${x.mine?' (kamu)':''}</span><span>${x.f>0?'🏁 '+fmt(x.f):x.h<=0?'😵 tersingkir':'📍 '+Math.round(x.z)+' m'}</span></div>`).join('');
+  const med=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'],card=$('#card');modal(true);card.scrollTop=0;
+  const rows=rk.map((x,i)=>`<div class="lpl" style="${x.mine?'background:#fff3c4;border-radius:10px;padding:4px 8px':''}"><span>${med[i]}</span><i style="background:${LC[x.ci]}"></i><span style="flex:1">${esc(x.n)}${x.mine?' (kamu)':''}</span><span>${x.f>0?'🏁 '+fmt(x.f):x.h<=0?'😵 tersingkir':'📍 '+Math.round(x.z)+' m'}</span></div>`).join('');
   const rc=L.miss.slice(0,3).map(q=>`<div class="ex">📖 <span class="ar" lang="ar">${esc(q.a)}</span> = <b>${esc(q.ta)}</b> (bukan “${esc(q.b)}”)</div>`).join('');
-  card.innerHTML=`<h2>${fin&&pos===0&&n>1?'🏆 Kamu juara 1!':fin?'🏁 Kamu sampai finis!':'🦉 Lomba selesai'}</h2>`+(fin?'<div class="ar center" lang="ar" style="font-size:32px;line-height:1.5">أَحْسَنْتَ! مَبْرُوكٌ</div>':'<div class="fc">Tidak apa-apa! Perhatikan pasangan katanya, lalu coba lagi bersama temanmu.</div>')+rows
+  card.innerHTML=`<h2>${fin&&pos===0&&n>1?(duo?'🏆 Timmu juara 1!':'🏆 Kamu juara 1!'):fin?'🏁 '+(duo?'Timmu':'Kamu')+' sampai finis!':'🦉 Lomba selesai'}</h2>`+(fin?'<div class="ar center" lang="ar" style="font-size:32px;line-height:1.5">أَحْسَنْتَ! مَبْرُوكٌ</div>':'<div class="fc">Tidak apa-apa! Perhatikan pasangan katanya, lalu coba lagi bersama temanmu.</div>')+rows
    +`<div class="ex">🪙 +${b} koin</div>`+(rc?'<div class="gt">Pasangan yang tadi bikin terpeleset</div>'+rc:'')
    +'<div class="exbt"><button class="opt go" id="lpag" type="button">🔁 Main lagi</button><button class="opt" id="lpcl" type="button">✖ Tutup</button></div>';
-  $('#lpag').onclick=()=>{T.ph='lobby';T.ck='';resetL();T.mid=T.mid;me()};$('#lpcl').onclick=leave;
+  $('#lpag').onclick=()=>{T.ph='lobby';T.ck='';resetL();me()};$('#lpcl').onclick=leave;
   if(fin){confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
 
 /* ---------- Per-frame ---------- */
 function showPair(c){
   const pr=T.pr;E.b.className=T.rv>0?'ok':T.rv<0?'no':'';
-  if(c.el<0){E.b.innerHTML='<div class="w"><div class="c">Bersiap…</div></div>';return}
+  if(c.el<0){const ix=c.ids.indexOf(dev),pk=dm(c)?c.ids[ix^1]:null,pt=pk?`<div class="m">👫 Timmu: ${esc(String((c.pp[pk]||{}).n||'Teman').slice(0,14))} (Tim ${(ix>>1)+1})</div>`:'';
+    E.b.innerHTML='<div class="w"><div class="c">Bersiap…</div></div>'+pt;return}
   E.b.innerHTML=`<div class="w"><div class="c a" lang="ar">${esc(pr.a)}</div><div class="e">${T.rv>0?'=':T.rv<0?'≠':'?'}</div><div class="c">${esc(pr.b)}</div></div>`
    +`<div class="m">${T.rv>0?'✔ BENAR — boleh maju!':T.rv<0?'✖ SALAH — diam! Yang benar: '+esc(pr.ta):'Cocok → LARI · Tidak cocok → DIAM'}</div><div class="t"><i id="lpti"></i></div>`;
   E.ti=$('#lpti');if(T.board)T.board.f()}
@@ -310,14 +322,14 @@ function frame(){
     const d=c.pp[k]||{},tz=AZ-num(d.z,0,9999,0)/10,x=(i-(n-1)/2)*LW;r.g.visible=true;
     const dz=(tz-r.g.position.z)*Math.min(1,dt*6),v=Math.min(1,Math.abs(dz)/Math.max(dt,.001)/SP);r.g.position.set(x,Math.abs(Math.sin(t*14+i))*.12*v,r.g.position.z+dz);r.v+=(v-r.v)*.2;
     const s2=Math.sin(t*15+i)*.9*r.v;r.aL.rotation.x=-s2;r.aR.rotation.x=s2;r.lL.rotation.x=s2;r.lR.rotation.x=-s2;
-    r.g.rotation.z=num(d.h,0,3,3)<=0?1.3:0;if(r.nm!==String(d.n||'Teman').slice(0,14))setTag(r,String(d.n||'Teman').slice(0,14),LC[i])}
+    r.g.rotation.z=num(d.h,0,3,3)<=0?1.3:0;if(r.nm!==String(d.n||'Teman').slice(0,14))setTag(r,String(d.n||'Teman').slice(0,14),r.tc||LC[i])}
   /* penonton, awan, burung hantu */
   const ch=now-T.cheer<900?.7:.12;T.crowd.forEach(o=>{o.g.position.y=o.y+Math.abs(Math.sin(t*(RM?0:4)+o.k))*ch});
   T.cl.forEach((g,i)=>{g.position.x+=Math.sin(t*.2+i)*.01});
   if(T.head){T.head.rotation.y=Math.sin(t*.8)*.25;T.head.rotation.z=T.rv>0?Math.sin(t*10)*.12:0;T.head.position.y=11+Math.sin(t*2)*.1}
   /* kamera */
   let sx=0,sy=0;if(T.shake>0){T.shake-=dt;if(!RM){sx=(Math.random()-.5)*T.shake*1.6;sy=(Math.random()-.5)*T.shake*1.6}}
-  cam.position.set(lx*.6+sx,6.8+sy,wz+13);cam.lookAt(lx*.4,4.8,wz-32)}
+  cam.position.set(lx*.6+sx,7.2+sy,wz+14);cam.lookAt(lx*.4,4.8,wz-32)}
 const R0=R.render;
 R.render=function(s,c){
   if(T.on&&s===S){try{frame()}catch(e){console.warn('arena',e);try{leave()}catch(_){}try{ts('⚠️ Arena error: '+e.message,4500)}catch(_){}}}
@@ -325,7 +337,7 @@ R.render=function(s,c){
 
 /* ---------- Tombol & input ---------- */
 {
-  const b=document.createElement('button');b.className='pill mx';b.id='arb';b.type='button';b.title='Arena Lampu Ilmu';b.setAttribute('aria-label','Arena Lampu Ilmu: lomba lari pasangan kata, 2 sampai 4 pemain');
+  const b=document.createElement('button');b.className='pill mx';b.id='arb';b.type='button';b.title='Arena Lampu Ilmu';b.setAttribute('aria-label','Arena Lampu Ilmu: lomba lari pasangan kata, 2 sampai 8 pemain');
   b.innerHTML='<span aria-hidden="true">🚦</span><span class="lb" aria-hidden="true">Arena</span>';
   const st=$('#stat'),ref=$('#exb');if(ref&&ref.after)ref.after(b);else if(st)st.appendChild(b);
   b.onclick=()=>{
