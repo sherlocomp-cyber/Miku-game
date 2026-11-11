@@ -1,16 +1,18 @@
 # CATATAN PROYEK: Kota Profesi (Miku-game)
 
-Repo: sherlocomp-cyber/Miku-game · dipublish lewat GitHub Pages · struktur: index.html, css/, js/01-29.
+Repo: sherlocomp-cyber/Miku-game · dipublish lewat GitHub Pages · struktur: index.html, css/, js/01-30 (js/30 dimuat SEBELUM js/26).
 
-## Tugas 2026-11-11: pesan guru ke semua siswa aktif (LANGKAH 1 SELESAI, belum diuji dengan siswa)
-- [x] js/29-pesan-guru.js : game memeriksa /pesanGuru tiap 7 detik, menampilkan kartu "Pesan dari Guru" (semua / per kelas), menunggu bila sedang Ujian Akhir
-- [x] index.html : memasang js/29 (?v=52)
-- [x] Dasbor guru (ruang-guru-miku.html, file terpisah, bukan di repo): kartu "Pesan ke siswa aktif" di tab Online, kirim ke semua atau satu kelas
-- [ ] Pengguna perlu memasang aturan Firebase: "pesanGuru": {".read": true, ".write": "auth != null && auth.uid == 'UID_GURU'"}
-Untuk membatalkan: hapus <script> js/29 di index.html.
+## Tugas 2026-11-11: pesan guru + Mode Guru (SELESAI, belum diuji)
+- [x] js/29-pesan-guru.js : siswa yang sedang bermain menerima kartu "Pesan dari Guru" (/pesanGuru/semua atau /pesanGuru/<kelas>)
+- [x] js/30-mode-guru.js : layar awal -> "🔑 Masuk guru", kata sandi bawaan `gurumiku` (hash di konstanta PASS). Nama karakter "Guru"; koin 99999, semua warga ⭐⭐⭐, semua kosakata/baju/misi selesai; tombol 📢 Guru untuk kirim pesan (semua / satu kelas). Data guru TIDAK ditulis ke /siswa dan /papan (fetch dicegat + window.FB distub)
+- [x] Dasbor guru (ruang-guru-miku.html, file terpisah): kartu "Pesan ke siswa aktif" di tab Online, tanpa login Firebase
+- [ ] Pengguna harus pasang aturan Firebase: "pesanGuru": {".read": true, "$target": {".write": true, ".validate": "newData.hasChildren(['id','t']) && newData.child('t').isString() && newData.child('t').val().length <= 160"}}
+- Batasan: kunci stasiun Jalur SAS (js/21) belum dibuka oleh mode guru (belum dibaca). Teman online (js/28) tetap aktif: guru terlihat sebagai "Guru" di ruang "umum".
+Untuk membatalkan: hapus <script> js/29 dan js/30 di index.html.
 
 ## Berikutnya
-- Langkah 2: Mode Guru di game (karakter/akun khusus guru, semua fitur terbuka, tidak tercatat sebagai siswa di /siswa dan tidak mengotori statistik kelas, kirim pesan dari dalam game). Perlu dipastikan dulu maksud "semua fitur" (semua stasiun/kostum/ujian terbuka?) dan cara masuk (login guru Firebase).
+- Uji: masuk guru di HP, kirim pesan ke akun siswa lain, cek kartu muncul.
+- Baca js/21 lalu buka semua stasiun Jalur SAS di mode guru (bila terkunci).
 
 ## Tugas 2026-11-07: rapikan HUD "terlalu rame" (SELESAI, belum diuji di HP)
 - [x] css/ringkas.css : HUD ringkas untuk layar sentuh / lebar <= 900px
