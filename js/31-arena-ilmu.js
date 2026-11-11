@@ -5,6 +5,7 @@
    Ada 4 gerbang; tiap gerbang 1 soal dari bank soal Ujian Akhir (EXM.build, zona 1-4). Salah = pembahasan lalu soal lain.
    Bintang = sisa hati (1-3). Data lokal: localStorage SK+':arena' = {try,win,best,bt,d}. Tidak memanggil rec() (Laporan guru tidak berubah).
    Kamera/render: membungkus R.render (aktif hanya saat arena menyala), arena 3D dibangun sekali di z=-1800 (jauh dari kota).
+   UX (v2): keluar dengan 2x ketuk (tanpa confirm()), getar di HP saat merah/terpeleset/jawab, tombol LARI berubah warna mengikuti lampu (arena.css).
    Cara balik ke tampilan lama: hapus baris <script> js/31 dan <link> css/arena.css di index.html. */
 (function(){
 'use strict';
@@ -17,11 +18,12 @@ const ZT=['Kosakata profesi, tempat & kegiatan','Dhamir munfasil & muttasil','Ta
 const SG={g:['🟢','اِرْكُضْ','LARI! Tahan tombol'],w:['🟡','اِسْتَعِدَّ','Bersiap…'],r:['🔴','قِفْ','BERHENTI! Lepas tombol']};
 const ARX=/[\u0600-\u06FF]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const SKA=SK+':arena';
-const A={on:false,built:false,ph:'idle',pt:0,v:0,hearts:3,gate:0,opening:0,cz:AZ,light:'g',lt:3,rg:0,run:false,kd:false,q:null,pool:[],miss:[],t0:0,el:0,tp:0,org:null,o:null,shake:0,locked:false,tried:0,won:false,hy:Math.PI,lastSay:0,pk:'',G:null,head:null,sig:null,gt:[],sv:{try:0,win:0,best:0,bt:0,d:''}};
+const A={on:false,built:false,ph:'idle',pt:0,v:0,hearts:3,gate:0,opening:0,cz:AZ,light:'g',lt:3,rg:0,run:false,kd:false,q:null,pool:[],miss:[],t0:0,el:0,tp:0,org:null,o:null,shake:0,locked:false,tried:0,won:false,hy:Math.PI,lastSay:0,pk:'',G:null,head:null,sig:null,gt:[],qc:0,sv:{try:0,win:0,best:0,bt:0,d:''}};
 try{Object.assign(A.sv,JSON.parse(lsg(SKA)||'{}'))}catch(e){}
 const persist=()=>{try{lss(SKA,JSON.stringify(A.sv))}catch(e){}};
 const heartStr=()=>'❤️'.repeat(Math.max(0,A.hearts))+'🖤'.repeat(Math.max(0,3-A.hearts));
 const E={};
+const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};let qT=0;
 
 /* ---------- 1. Elemen layar (HUD, sinyal, tombol lari) ---------- */
 (function(){
@@ -32,6 +34,7 @@ const E={};
    +'<div id="arc" aria-hidden="true"></div>';
   while(w.firstChild)document.body.appendChild(w.firstChild);
   E.he=$('#arhe');E.bi=$('#arbi');E.g=$('#arg');E.q=$('#arq');E.sig=$('#arsig');E.run=$('#arrun');E.c=$('#arc');
+  if(matchMedia('(pointer:coarse)').matches){const sm=E.run.querySelector('small');if(sm)sm.textContent='tahan untuk lari'}
 })();
 
 /* ---------- 2. Menggambar papan (kanvas) ---------- */
@@ -110,6 +113,7 @@ function setLight(l,d){
   if(A.sig)A.sig.f();
   if(k!==prev){
     snd(k=='r'?220:k=='g'?660:440,k=='r'?.25:.1,k=='r'?'square':'triangle',.05);
+    if(k=='r'&&A.ph=='play')vib(30);
     const now=performance.now();
     if((k=='r'||k=='g')&&A.ph=='play'&&now-A.lastSay>900){A.lastSay=now;say(k=='r'?'قف':'اركض')}}}
 function begin(){
@@ -124,7 +128,7 @@ function begin(){
   pl.x=0;pl.y=0;pl.z=AZ;pl.yaw=0;pl.vy=0;
   A.ph='count';A.pt=0;A.tp=performance.now();setLight('g',3);updHud()}
 function leave(){
-  const was=A.on;A.on=false;A.ph='idle';A.run=false;A.kd=false;
+  const was=A.on;qreset();A.on=false;A.ph='idle';A.run=false;A.kd=false;
   E.run.classList.remove('on');E.c.className='';
   if(was){
     const o=A.org;if(o){S.background=o.bg;S.fog.color.setHex(o.fc);S.fog.near=o.fn;S.fog.far=o.ff;cam.fov=o.fov;cam.far=o.far;cam.updateProjectionMatrix()}
@@ -132,7 +136,11 @@ function leave(){
     P.rotation.order='XYZ';P.rotation.set(0,0,0);P.scale.setScalar(1);P.armL.rotation.set(0,0,0);P.armR.rotation.set(0,0,0);P.legL.rotation.x=P.legR.rotation.x=0;
     if(A.o){pl.x=A.o.x;pl.y=0;pl.z=A.o.z;pl.yaw=A.o.yaw}pl.vy=0}
   document.body.classList.remove('arn');modal(false);open=false;mode=null}
-function quit(){if(!A.on)return;if(!confirm('Keluar dari arena? Percobaan ini tidak dihitung menang.'))return;leave()}
+function qreset(){A.qc=0;clearTimeout(qT);E.q.textContent='✖';const x=$('#arqx');if(x&&x.dataset.t){x.textContent=x.dataset.t;delete x.dataset.t}}
+function quit(){if(!A.on)return;
+  if(A.qc){qreset();leave();return}
+  A.qc=1;E.q.textContent='Keluar? Ketuk lagi';const x=$('#arqx');if(x){x.dataset.t=x.textContent;x.textContent='Yakin keluar? Ketuk sekali lagi'}
+  qT=setTimeout(qreset,3200)}
 function nextQ(z){
   let i=A.pool.findIndex(x=>x.zi===z&&!x.u);
   if(i<0){A.pool=EXM.build();i=A.pool.findIndex(x=>x.zi===z&&!x.u)}
@@ -140,7 +148,7 @@ function nextQ(z){
 function ask(){
   A.ph='ask';A.locked=false;A.v=0;A.tried=0;setLight('g',99);A.q=nextQ(A.gate);showQ(A.q)}
 function showQ(q){
-  const c=$('#card');modal(true);c.scrollTop=0;
+  A.qc=0;const c=$('#card');modal(true);c.scrollTop=0;
   c.innerHTML=`<h2 style="color:${ZC[A.gate]}">🚪 Gerbang ${A.gate+1}/${GN}</h2><div class="stp">${heartStr()} · ${ZT[A.gate]}</div><div class="q">${q.q}</div>`
    +(q.sp?'<button class="opt spk" id="arsp" type="button">🔊 Dengarkan</button>':'')
    +q.o.map((x,k)=>`<button class="opt ${ARX.test(x)?'ar':''}" data-i="${k}" type="button">${x}</button>`).join('')
@@ -154,11 +162,11 @@ function pick(i){
   const q=A.q,c=$('#card'),ok=i===q.c,fb=$('#fb');
   c.querySelectorAll('.opt[data-i]').forEach(b=>{b.disabled=true;const k=+b.dataset.i;if(k===q.c)b.classList.add('ok');else if(k===i)b.classList.add('no')});
   if(ok){
-    const g=A.tried?2:5;coins+=g;hud();snd(988,.15,'triangle');
+    const g=A.tried?2:5;coins+=g;hud();snd(988,.15,'triangle');vib(20);
     fb.innerHTML=`<span style="color:#14744b"><b>✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Benar! +${g} 🪙</b></span><div class="ex">💡 ${q.ex||''}</div><button class="opt go" id="arnx" type="button">🚪 Buka gerbang ▶</button>`;
     $('#arnx').onclick=openGate}
   else{
-    A.tried=1;if(!A.miss.includes(q))A.miss.push(q);snd(180,.25,'sawtooth');
+    A.tried=1;if(!A.miss.includes(q))A.miss.push(q);snd(180,.25,'sawtooth');vib([60,40]);
     fb.innerHTML=`<span style="color:#b8352b"><b>🦉 Belum tepat. Jawaban benar ditandai hijau.</b></span><div class="ex">💡 ${q.ex||''}</div><button class="opt go" id="arnx" type="button">🔁 Coba soal lain ▶</button>`;
     $('#arnx').onclick=()=>{A.locked=false;A.q=nextQ(A.gate);showQ(A.q)}}
   const nx=$('#arnx');try{nx.focus({preventScroll:true});nx.scrollIntoView({block:'nearest'})}catch(e){}}
@@ -166,14 +174,14 @@ function openGate(){
   modal(false);A.cz=GZ[A.gate]+STOP;A.opening=A.gate;A.ph='open';A.pt=0;
   snd(660,.1,'triangle');setTimeout(()=>snd(880,.15,'triangle'),100)}
 function caught(){
-  A.hearts--;A.ph='caught';A.pt=0;A.v=0;A.shake=.5;snd(160,.35,'sawtooth',.08);updHud();
+  A.hearts--;A.ph='caught';A.pt=0;A.v=0;A.shake=.5;snd(160,.35,'sawtooth',.08);vib([90,50,90]);updHud();
   flash(A.hearts>0?'😵‍💫 Terpeleset!<br><small>Kembali ke gerbang terakhir</small>':'😵‍💫 Hatimu habis!',1)}
 function afterCaught(){
   E.c.className='';
   if(A.hearts<=0){lose();return}
   pl.z=A.cz;A.ph='play';A.pt=0;setLight('g',2.2)}
 function win(){
-  A.ph='done';A.won=true;A.pt=0;A.el=Math.round((performance.now()-A.t0)/1000);
+  A.ph='done';A.won=true;A.pt=0;A.el=Math.round((performance.now()-A.t0)/1000);vib([40,40,40,40,120]);
   const h=A.hearts,first=A.sv.d!==dstr();let b=60+h*30;if(first){b+=100;A.sv.d=dstr()}
   A.sv.win=(A.sv.win||0)+1;A.sv.best=Math.max(A.sv.best||0,h);if(!A.sv.bt||A.el<A.sv.bt)A.sv.bt=A.el;persist();coins+=b;hud();
   setTimeout(()=>{if(A.on&&A.ph=='done')cardWin(b,first)},900)}
