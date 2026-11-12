@@ -49,7 +49,7 @@ const L=window.JKL;
 if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||typeof P==='undefined'||typeof pl==='undefined'||typeof cam==='undefined'||typeof EXM==='undefined'||typeof EXM.build!=='function'){console.warn('Kaca: modul pendukung belum siap');return}
 
 const N=L.N,TZ=-5200,PX=-8,PXB=8,COL=2.3,SZ=5,CD=3,TAPG=250,SC=.85;
-const ARX=/[\u0600-\u06FF]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const ARX=/[؀-ۿ]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const SKT=SK+':kaca';
 const jp=t=>{try{return JSON.parse(t)}catch(e){return null}};
 const num=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.max(a,Math.min(b,v)):(d||0)};
