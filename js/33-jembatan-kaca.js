@@ -1,9 +1,12 @@
-/* === BAGIAN 33 (v2): Jembatan Kaca Ilmu (arena kedua dari rencana Arena Belajar) ===
+/* === BAGIAN 33 (v3): Jembatan Kaca Ilmu (arena kedua dari rencana Arena Belajar) ===
    v2: soal salah diulang 3 soal kemudian (maks 2x) dan dicatat sebagai soal lemah (muncul lebih awal di permainan berikutnya);
    salah beruntun = jeda jatuh 3 -> 4,5 -> 6 dtk (anti-tebak); lawan otomatis naik/turun tingkat (2 menang/2 kalah beruntun);
-   mode Tim gantian (2 tim, 1 layar, 5 menit, tanpa koin); kamera bergoyang saat kaca pecah; celoteh Hud-hud; rekor harian.
+   mode Tim gantian (2 tim, 1 layar, tanpa koin); kamera bergoyang saat kaca pecah; celoteh Hud-hud; rekor harian.
+   v3: jumlah soal bisa ditentukan (20-60, bawaan 20; tombol 20/30/40/50 atau ketik sendiri). Jumlah petak = soal + soal/3, jadi jawaban
+   sempurna menjawab tepat sejumlah itu (lompatan beruntun sudah diperhitungkan); soal diacak baru tiap main; batas waktu dan bot ikut
+   menyesuaikan; rekor dipisah per jumlah soal; Intip 1 kali tiap 10 soal; arena 3D dibangun ulang bila jumlah soal berubah.
    Modul mandiri, tidak mengubah file 01-32 (hanya memakai global-nya). Dimuat setelah js/32. Tanpa internet: main sendiri melawan Kak Hud-hud.
-   Permainan: 8 petak jembatan kaca. Tiap petak ada 2 kaca (kiri/kanan), masing-masing berisi satu pilihan jawaban. Pilih kaca yang benar = maju.
+   Permainan (nilai awal di bawah masih berlaku per 8 petak untuk contoh): jembatan kaca. Tiap petak ada 2 kaca (kiri/kanan), masing-masing berisi satu pilihan jawaban. Pilih kaca yang benar = maju.
    Kaca salah = pecah, karakter jatuh ke awan empuk, muncul lagi di pos aman terakhir (tiap 3 petak) sesudah 3 dtk; jembatan dipulihkan.
    Waktu habis (12 dtk per soal) = tidak maju, kaca benar ditunjukkan, jeda sebentar (tidak jatuh). 3 benar beruntun = lompat 2 petak.
    Intip: 1 kali per permainan, didapat saat beruntun 3 pertama; kaca yang benar berkilat 1 dtk. Lawan: Kak Hud-hud di jembatan sebelah
@@ -16,27 +19,35 @@
 /* ---------- Logika murni (dites di Node lewat window.JKL) ---------- */
 const N=8,CP=3,DUR=150,FALL=3000,QT=12;
 const LV=['Santai','Normal','Sulit'],BMS=[6500,5000,3600],BPF=[.25,.20,.13];
+/* v3: panjang jembatan = jumlah soal (20-60, bawaan 20); batas waktu ikut menyesuaikan */
+const NMIN=20,NMAX=60,NDEF=20;
+const clampN=v=>{v=Math.round(+v);return isFinite(v)&&v>0?Math.max(NMIN,Math.min(NMAX,v)):NDEF};
+/* petak = soal + soal/3: tiap 3 benar beruntun melompat +1 petak, jadi jawaban sempurna tetap menjawab tepat `soal` soal (minimal) */
+const petak=q=>q+Math.floor(q/3);
+/* durOf/durT menerima JUMLAH PETAK */
+const durOf=n=>Math.max(DUR,Math.round(n*19)),durT=n=>Math.round(n*24);
 function rng(s){s=s>>>0;return function(){s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 /* jadwal bot: [{t(ms),p(posisi sesudah),f(1=jatuh),k(petak yang dicoba, -1=muncul lagi),s(sisi kaca)}] */
-function plan(seed,lv){
-  const r=rng(seed),bm=BMS[lv]||BMS[1],pf=BPF[lv]==null?BPF[1]:BPF[lv],ev=[{t:0,p:0,f:0,k:-1,s:0}];
+function plan(seed,lv,n){
+  n=n||N;const r=rng(seed),bm=BMS[lv]||BMS[1],pf=BPF[lv]==null?BPF[1]:BPF[lv],ev=[{t:0,p:0,f:0,k:-1,s:0}];
   let t=0,p=0,g=0;
-  while(p<N&&t<DUR*2000&&g++<500){
+  while(p<n&&t<durOf(n)*2000&&g++<3000){
     t+=bm*(.75+r()*.5);
     const k=p,safe=r()<.5?0:1;
     if(r()<pf){ev.push({t,p,f:1,k,s:1-safe});t+=FALL;p=Math.floor(p/CP)*CP;ev.push({t,p,f:0,k:-1,s:0})}
     else{p++;ev.push({t,p,f:0,k,s:safe})}}
   return ev}
 const at=(ev,ms)=>{let e=ev[0];for(let i=1;i<ev.length&&ev[i].t<=ms;i++)e=ev[i];return e};
-const fin=ev=>{for(let i=0;i<ev.length;i++)if(ev[i].p>=N&&!ev[i].f)return ev[i].t;return Infinity};
-function resolve(p,st,ok){
+const fin=(ev,n)=>{n=n||N;for(let i=0;i<ev.length;i++)if(ev[i].p>=n&&!ev[i].f)return ev[i].t;return Infinity};
+function resolve(p,st,ok,n){
+  n=n||N;
   if(!ok)return{p:Math.floor(p/CP)*CP,st:0,fall:1,jump:0};
-  const s=st+1,j=s%3===0?2:1;return{p:Math.min(N,p+j),st:s,fall:0,jump:j}}
-function verdict(pt,bt,pp,bp,ms){
+  const s=st+1,j=s%3===0?2:1;return{p:Math.min(n,p+j),st:s,fall:0,jump:j}}
+function verdict(pt,bt,pp,bp,ms,d){
   const pd=pt!==null&&pt<=ms,bd=bt<=ms;
   if(pd&&(!bd||pt<=bt))return{ended:1,win:'p'};
   if(bd)return{ended:1,win:'b'};
-  if(ms>=DUR*1000)return{ended:1,win:pp>bp?'p':pp<bp?'b':''};
+  if(ms>=(d||DUR)*1000)return{ended:1,win:pp>bp?'p':pp<bp?'b':''};
   return{ended:0,win:''}}
 function pair(q,r){
   const wr=[];q.o.forEach((x,i)=>{if(i!==q.c)wr.push(i)});
@@ -65,7 +76,7 @@ function tverdict(w,a,b,ms,dur){
   if(w)return{ended:1,win:w===1?'a':'b'};
   if(ms>=(dur||DUR)*1000)return{ended:1,win:a>b?'a':a<b?'b':''};
   return{ended:0,win:''}}
-window.JKL={N,CP,DUR,FALL,QT,LV,BMS,BPF,rng,plan,at,fin,resolve,verdict,pair,fallFor,qkey,requeue,prio,adapt,tverdict};
+window.JKL={N,CP,DUR,FALL,QT,LV,BMS,BPF,NMIN,NMAX,NDEF,clampN,petak,durOf,durT,rng,plan,at,fin,resolve,verdict,pair,fallFor,qkey,requeue,prio,adapt,tverdict};
 })();
 
 (function(){
@@ -74,28 +85,30 @@ if(window.JKI)return;
 const L=window.JKL;
 if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||typeof P==='undefined'||typeof pl==='undefined'||typeof cam==='undefined'||typeof EXM==='undefined'||typeof EXM.build!=='function'){console.warn('Kaca: modul pendukung belum siap');return}
 
-const N=L.N,TZ=-5200,PX=-8,PXB=8,COL=2.3,SZ=5,CD=3,TAPG=250,SC=.85,DURT=300;
+let Q=L.NDEF,N=L.petak(L.NDEF); /* Q = jumlah soal, N = jumlah petak */
+const TZ=-5200,PX=-8,PXB=8,COL=2.3,SZ=5,CD=3,TAPG=250,SC=.85;
 const ARX=/[؀-ۿ]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const SKT=SK+':kaca';
 const jp=t=>{try{return JSON.parse(t)}catch(e){return null}};
 const num=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.max(a,Math.min(b,v)):(d||0)};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
-const zg=k=>TZ-k*SZ,zp=p=>p<=0?TZ+7:p>=N?TZ-42.8:zg(p-1);
+const zg=k=>TZ-k*SZ,endZ=()=>TZ-(N-1)*SZ-7.8,zp=p=>p<=0?TZ+7:p>=N?endZ():zg(p-1);
 const sxOf=(bx,p,sx)=>p<=0||p>=N?bx:bx+(sx[p]?COL:-COL);
 const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 const lsRead=()=>{try{return typeof lsg==='function'?lsg(SKT):localStorage.getItem(SKT)}catch(e){return null}};
 const T={on:false,built:false,ph:'idle',G:null,ru:null,bu:null,gl:{p:[],b:[]},ov:[],sh:[],gm:[],cl:[],op:['',''],pr:null,q:null,qb:null,qs:0,nxt:0,qc:0,
   p:0,st:0,pkn:0,pkg:0,fl:null,vd:null,endAt:0,pt:null,sx:[],t0:0,plan:[],bi:0,bp:0,bfin:Infinity,nok:0,nall:0,miss:[],cdn:'',hk:'',tp:0,tt:0,cz:0,pool:[],lv:1,org:null,o:null,
-  cw:0,cur:0,tm:0,tms:[null,null],rs:0,tw:0,shk:0,sayT:0,rqok:0,sg:[],
-  sv:{try:0,win:0,best:0,d:'',lv:1,auto:1,h:[],wk:[],bd:{d:'',t:0}}};
+  cw:0,cur:0,tm:0,tms:[null,null],rs:0,tw:0,shk:0,sayT:0,rqok:0,sg:[],n:20,bn:0,
+  sv:{try:0,win:0,d:'',lv:1,auto:1,h:[],wk:[],n:20,bs:{},bd:{d:'',m:{}}}};
 try{Object.assign(T.sv,jp(lsRead()||'{}')||{})}catch(e){}
-if(!Array.isArray(T.sv.wk))T.sv.wk=[];if(!Array.isArray(T.sv.h))T.sv.h=[];if(!T.sv.bd||typeof T.sv.bd!=='object')T.sv.bd={d:'',t:0};
-T.lv=num(T.sv.lv,0,2,1);
+if(!Array.isArray(T.sv.wk))T.sv.wk=[];if(!Array.isArray(T.sv.h))T.sv.h=[];
+if(!T.sv.bs||typeof T.sv.bs!=='object')T.sv.bs={};if(!T.sv.bd||typeof T.sv.bd!=='object'||!T.sv.bd.m)T.sv.bd={d:'',m:{}};
+T.lv=num(T.sv.lv,0,2,1);T.n=L.clampN(T.sv.n);
 /* pemain aktif: mode lawan selalu tim 0; mode tim bergantian 0/1 */
 const RU=()=>T.cur?T.bu:T.ru,BX=()=>T.cur?PXB:PX,GL=()=>T.cur?T.gl.b:T.gl.p;
 const pos=i=>T.tm?(T.cur===i?T.p:T.bp):(i?T.bp:T.p);
-const dur=()=>T.tm?DURT:L.DUR;
+const dur=()=>T.tm?L.durT(N):L.durOf(N);
 const TF=['p','st','pkn','pkg','fl','pt','sx','nok','nall','cw','rs'];
 function swapTeam(){
   const o={};TF.forEach(k=>{o[k]=T[k]});T.tms[T.cur]=o;
@@ -188,31 +201,36 @@ function paint(o,txt,st){
 
 /* ---------- Arena 3D (dibangun sekali) ---------- */
 const setG=(m,s)=>{m.visible=s!==2;m.material=s===1?T.gm[1]:T.gm[0]};
+/* bangun ulang arena bila jumlah petak berubah */
+function destroy(){
+  try{if(T.G){S.remove(T.G);T.G.traverse(o=>{try{if(o.geometry&&o.geometry.dispose)o.geometry.dispose();const ms=o.material?[].concat(o.material):[];ms.forEach(m=>{if(m.map&&m.map.dispose)m.map.dispose();if(m.dispose)m.dispose()})}catch(e){}})}}catch(e){}
+  T.G=null;T.built=false;T.gl={p:[],b:[]};T.ov=[];T.sh=[];T.cl=[];T.sg=[];T.gm=[];T.ru=null;T.bu=null}
 function mk(){
-  if(T.built)return;T.built=true;
+  if(T.built)return;T.built=true;T.bn=N;
   const G0=T.G=new THREE.Group();G0.visible=false;S.add(G0);
   const L0=c=>new THREE.MeshLambertMaterial({color:c}),B0=c=>new THREE.MeshBasicMaterial({color:c});
   const bx=(g,w,h,d,c,x,y,z,basic)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),basic?B0(c):L0(c));m.position.set(x,y,z);g.add(m);return m};
-  const r0=L.rng(7);
+  const r0=L.rng(7),ext=(N-8)*SZ,eZ=endZ();
   /* lembah berawan di bawah jembatan */
-  bx(G0,320,1,280,0xdff1ff,0,-17,TZ-20,1);
+  bx(G0,320,1,280+ext,0xdff1ff,0,-17,TZ-20-ext/2,1);
   const cg=new THREE.SphereGeometry(1,10,8),cm=L0(0xffffff);
-  for(let k=0;k<70;k++){const m=new THREE.Mesh(cg,cm),s=5+r0()*9;m.scale.set(s*1.4,s*.6,s);m.position.set(-75+r0()*150,-15+r0()*3,TZ-75+r0()*115);G0.add(m)}
+  for(let k=0,nc=70+Math.round(ext/2);k<nc;k++){const m=new THREE.Mesh(cg,cm),s=5+r0()*9;m.scale.set(s*1.4,s*.6,s);m.position.set(-75+r0()*150,-15+r0()*3,TZ-75-ext+r0()*(115+ext));G0.add(m)}
   /* tebing dan matahari */
-  for(let k=0;k<10;k++){const s=k%2?1:-1,h=26+r0()*22,m=new THREE.Mesh(new THREE.ConeGeometry(14+r0()*8,h,6),L0(k%3?0x8aa3b8:0x7a93a8));m.position.set(s*(48+r0()*30),h/2-17,TZ+20-k*8);G0.add(m)}
-  const sun=new THREE.Mesh(new THREE.SphereGeometry(9,16,12),B0(0xfff2a8));sun.material.fog=false;sun.position.set(60,60,TZ-120);G0.add(sun);
-  for(let k=0;k<8;k++){const g=new THREE.Group();g.position.set(-110+k*32,45+(k%3)*7,TZ-100);[[0,0],[5,-1],[-5,-1],[2,2]].forEach(o=>{const m=new THREE.Mesh(new THREE.SphereGeometry(5,10,8),L0(0xffffff));m.position.set(o[0],o[1],0);m.scale.y=.6;g.add(m)});G0.add(g);T.cl.push(g)}
+  for(let k=0,nt=10+Math.ceil(ext/8);k<nt;k++){const s=k%2?1:-1,h=26+r0()*22,m=new THREE.Mesh(new THREE.ConeGeometry(14+r0()*8,h,6),L0(k%3?0x8aa3b8:0x7a93a8));m.position.set(s*(48+r0()*30),h/2-17,TZ+20-k*8);G0.add(m)}
+  const sun=new THREE.Mesh(new THREE.SphereGeometry(9,16,12),B0(0xfff2a8));sun.material.fog=false;sun.position.set(60,60,TZ-120-ext);G0.add(sun);
+  for(let k=0;k<8;k++){const g=new THREE.Group();g.position.set(-110+k*32,45+(k%3)*7,TZ-100-ext);[[0,0],[5,-1],[-5,-1],[2,2]].forEach(o=>{const m=new THREE.Mesh(new THREE.SphereGeometry(5,10,8),L0(0xffffff));m.position.set(o[0],o[1],0);m.scale.y=.6;g.add(m)});G0.add(g);T.cl.push(g)}
   /* bahan kaca bersama */
   T.gm=[new THREE.MeshBasicMaterial({color:0x9fe0ff,transparent:true,opacity:.42,depthWrite:false}),new THREE.MeshBasicMaterial({color:0x57d68d,transparent:true,opacity:.66,depthWrite:false})];
   const gg=new THREE.BoxGeometry(4.2,.2,4.4),eg=new THREE.EdgesGeometry(gg),em=new THREE.LineBasicMaterial({color:0xffffff});
   const bridge=(x0,arr,name,colr)=>{
-    bx(G0,11,1,9,0x6b7a8f,x0,-.6,TZ+7.3);bx(G0,11,1,10,0x6b7a8f,x0,-.6,TZ-42.8);
-    [-1,1].forEach(s=>{bx(G0,.5,.5,54,0x44546a,x0+s*(COL+2.5),-.5,TZ-17);bx(G0,.18,.18,54,0xffcf3f,x0+s*(COL+2.5),1.7,TZ-17,1);
-      for(let k=0;k<9;k++)bx(G0,.25,2,.25,0x44546a,x0+s*(COL+2.5),.7,TZ+9-k*6.4)});
-    [2,5].forEach(k=>[-1,1].forEach(s=>bx(G0,4.8,.1,5,0xffcf3f,x0+s*COL,-.25,zg(k),1)));
+    const rl=11.2+(TZ-eZ),rc=(TZ+8.8+eZ)/2;
+    bx(G0,11,1,9,0x6b7a8f,x0,-.6,TZ+7.3);bx(G0,11,1,10,0x6b7a8f,x0,-.6,eZ);
+    [-1,1].forEach(s=>{bx(G0,.5,.5,rl,0x44546a,x0+s*(COL+2.5),-.5,rc);bx(G0,.18,.18,rl,0xffcf3f,x0+s*(COL+2.5),1.7,rc,1);
+      for(let k=0,np=Math.ceil(rl/6.4);k<np;k++)bx(G0,.25,2,.25,0x44546a,x0+s*(COL+2.5),.7,TZ+9-k*6.4)});
+    for(let k=L.CP-1;k<N-1;k+=L.CP)[-1,1].forEach(s=>bx(G0,4.8,.1,5,0xffcf3f,x0+s*COL,-.25,zg(k),1));
     for(let k=0;k<N;k++){arr[k]=[];for(let s=0;s<2;s++){const m=new THREE.Mesh(gg,T.gm[0]);m.position.set(x0+(s?COL:-COL),0,zg(k));m.add(new THREE.LineSegments(eg,em));G0.add(m);arr[k][s]=m}}
-    [-1,1].forEach(s=>bx(G0,.7,9,.7,0x5a3a1c,x0+s*5.4,4.5,TZ-46));bx(G0,11.5,.7,.7,0x5a3a1c,x0,9,TZ-46);
-    const e=sign(9,2.6,'🏁 SAMPAI!',colr);e.position.set(x0,7.4,TZ-46);G0.add(e);
+    [-1,1].forEach(s=>bx(G0,.7,9,.7,0x5a3a1c,x0+s*5.4,4.5,eZ-3.2));bx(G0,11.5,.7,.7,0x5a3a1c,x0,9,eZ-3.2);
+    const e=sign(9,2.6,'🏁 SAMPAI!',colr);e.position.set(x0,7.4,eZ-3.2);G0.add(e);
     const b=sign(9,2.6,name,colr);b.position.set(x0,6,TZ+12);G0.add(b);T.sg.push(b)};
   bridge(PX,T.gl.p,'🧒 Jalurmu','#178a55');bridge(PXB,T.gl.b,'🦉 Hud-hud','#b85c0a');
   /* kaca bertulisan untuk petak yang sedang dijawab */
@@ -270,22 +288,31 @@ const miss=q=>{
   if(!T.tm&&T.sv.wk.indexOf(t)<0){T.sv.wk.push(t);if(T.sv.wk.length>60)T.sv.wk.shift();persist()}};
 function nextQ(){
   let i=T.pool.findIndex(x=>!x.u);
-  if(i<0){T.pool=L.prio(EXM.build(),T.tm?[]:T.sv.wk,Math.random);i=T.pool.findIndex(x=>!x.u)}
+  if(i<0){T.pool=L.prio(EXM.build().map(q=>Object.assign({},q,{u:0,rq:0,done:false})),T.tm?[]:T.sv.wk,Math.random);i=T.pool.findIndex(x=>!x.u)}
   const q=T.pool[i<0?0:i];q.u=1;return q}
 function intro(){
   if(open||!ready||T.on)return;
   open=true;mode='kaca';const c=$('#card'),s=T.sv;modal(true);c.scrollTop=0;
-  c.innerHTML='<h2>🌉 Jembatan Kaca Ilmu</h2><div class="fc">Jembatan punya 8 petak, tiap petak 2 kaca. Soal muncul, lalu pilih kaca yang berisi <b>jawaban benar</b> untuk melangkah. Sampai seberang lebih dulu dari Kak Hud-hud!</div>'
-   +`<div class="exst"><div><b>${s.win||0}</b><small>kali menang</small></div><div><b>${s.best?s.best+' dtk':'-'}</b><small>tercepat</small></div><div><b>${s.try||0}</b><small>kali main</small></div></div>`
+  const bsOf=n=>(s.bs&&s.bs[n])||0,bdOf=n=>s.bd&&s.bd.d===dstr()&&s.bd.m&&s.bd.m[n]||0;
+  c.innerHTML='<h2>🌉 Jembatan Kaca Ilmu</h2><div class="fc">Jembatan panjang, tiap petak 2 kaca dan satu soal acak. Pilih kaca yang berisi <b>jawaban benar</b> untuk melangkah. Sampai seberang lebih dulu dari Kak Hud-hud!</div>'
+   +'<div class="jklv" role="group" aria-label="Jumlah soal"><span>📏 Jumlah soal:</span>'+[20,30,40,50].map(n=>`<button type="button" data-n="${n}" class="${n===T.n?'on':''}" aria-pressed="${n===T.n}">${n}</button>`).join('')
+   +`<input id="jkn" type="number" inputmode="numeric" min="${L.NMIN}" max="${L.NMAX}" value="${T.n}" aria-label="Jumlah soal sendiri, ${L.NMIN} sampai ${L.NMAX}" style="width:68px;min-height:40px;border:3px solid #1d2b53;border-radius:999px;text-align:center;font:700 14px 'Baloo 2',system-ui,sans-serif;color:#1d2b53;background:#fff"></div>`
+   +`<div class="ex" id="jknt"></div>`
+   +`<div class="exst"><div><b>${s.win||0}</b><small>kali menang</small></div><div><b id="jkbs"></b><small>tercepat</small></div><div><b>${s.try||0}</b><small>kali main</small></div></div>`
    +'<div class="exrw"><b>💥</b><span><b>Kaca salah pecah!</b> Kamu jatuh ke awan empuk dan muncul lagi di pos aman (tiap 3 petak). Tenang, tidak sakit.</span></div>'
-   +'<div class="exrw"><b>🔥</b><span><b>Beruntun 3 kali benar</b> = lompat 2 petak, dan kamu dapat <b>Intip 👁</b> (1 kali per main).</span></div>'
+   +'<div class="exrw"><b>🔥</b><span><b>Beruntun 3 kali benar</b> = lompat 2 petak, dan kamu dapat <b>Intip 👁</b> (1 kali tiap 10 petak).</span></div>'
    +`<div class="exrw"><b>⏱</b><span>Tiap soal ada waktu ${L.QT} detik. Waktu habis tidak membuatmu jatuh, tapi kamu menunggu sebentar.</span></div>`
-   +(s.bd&&s.bd.d===dstr()&&s.bd.t?`<div class="ex">⚡ Tercepat hari ini: <b>${s.bd.t} dtk</b></div>`:'')
+   +'<div class="ex" id="jkbd"></div>'
    +'<div class="jklv" role="group" aria-label="Mode"><span>🎮 Mode:</span><button type="button" data-md="0" class="'+(T.tm?'':'on')+'" aria-pressed="'+!T.tm+'">🦉 Lawan Hud-hud</button><button type="button" data-md="1" class="'+(T.tm?'on':'')+'" aria-pressed="'+!!T.tm+'">👥 Tim gantian</button></div>'
-   +'<div class="fc" id="jkmn" style="display:'+(T.tm?'block':'none')+'">Dua tim bergantian menjawab di satu layar (cocok diproyeksikan ke kelas). Tim yang sampai seberang lebih dulu menang. Batas 5 menit. Tanpa koin.</div>'
+   +'<div class="fc" id="jkmn" style="display:'+(T.tm?'block':'none')+'">Dua tim bergantian menjawab di satu layar (cocok diproyeksikan ke kelas). Tim yang sampai seberang lebih dulu menang. Tanpa koin.</div>'
    +'<div class="jklv" id="jklr" style="display:'+(T.tm?'none':'flex')+'" role="group" aria-label="Tingkat lawan"><span>🦉 Lawan:</span>'+L.LV.map((l,k)=>`<button type="button" data-lv="${k}" class="${k===T.lv?'on':''}" aria-pressed="${k===T.lv}">${l}</button>`).join('')+`<button type="button" data-au="1" class="${s.auto!==0?'on':''}" aria-pressed="${s.auto!==0}">🤖 Otomatis</button></div>`
    +'<div class="exbt"><button class="opt go" id="jkgo" type="button">▶ Mulai</button><button class="opt" id="jkno" type="button">✖ Nanti saja</button></div>';
   const ui=()=>{
+    c.querySelectorAll('[data-n]').forEach(x=>{const on=+x.dataset.n===T.n;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
+    const nt=$('#jknt'),bs=$('#jkbs'),bd=$('#jkbd'),P=L.petak(T.n),D=T.tm?L.durT(P):L.durOf(P);
+    if(nt)nt.textContent='📏 Minimal '+T.n+' soal acak ('+P+' petak), batas waktu '+fmt(D)+(T.tm?' (mode Tim)':'');
+    if(bs)bs.textContent=bsOf(T.n)?bsOf(T.n)+' dtk':'-';
+    if(bd)bd.textContent=bdOf(T.n)?'⚡ Tercepat hari ini ('+T.n+' soal): '+bdOf(T.n)+' dtk':'';
     c.querySelectorAll('[data-lv]').forEach(x=>{const on=+x.dataset.lv===T.lv;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
     c.querySelectorAll('[data-au]').forEach(x=>{const on=T.sv.auto!==0;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
     c.querySelectorAll('[data-md]').forEach(x=>{const on=+x.dataset.md===T.tm;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
@@ -293,16 +320,24 @@ function intro(){
   c.querySelectorAll('[data-lv]').forEach(b=>{b.onclick=()=>{T.lv=num(b.dataset.lv,0,2,1);T.sv.lv=T.lv;T.sv.auto=0;T.sv.h=[];persist();ui()}});
   c.querySelectorAll('[data-au]').forEach(b=>{b.onclick=()=>{T.sv.auto=T.sv.auto===0?1:0;T.sv.h=[];persist();ui()}});
   c.querySelectorAll('[data-md]').forEach(b=>{b.onclick=()=>{T.tm=+b.dataset.md?1:0;ui()}});
-  $('#jkgo').onclick=begin;$('#jkno').onclick=()=>{modal(false);open=false;mode=null}}
+  const setN=n=>{T.n=L.clampN(n);T.sv.n=T.n;persist()};
+  c.querySelectorAll('[data-n]').forEach(b=>{b.onclick=()=>{setN(b.dataset.n);const i=$('#jkn');if(i)i.value=T.n;ui()}});
+  {const i=$('#jkn');if(i){
+    i.oninput=()=>{const v=Math.round(+i.value);if(v>=L.NMIN&&v<=L.NMAX){setN(v);ui()}};
+    i.onchange=()=>{setN(i.value);i.value=T.n;ui()}}}
+  ui();
+  $('#jkgo').onclick=()=>begin();$('#jkno').onclick=()=>{modal(false);open=false;mode=null}}
 function reset(now){
   T.p=0;T.st=0;T.pkn=0;T.pkg=0;T.q=null;T.qb=null;T.nxt=0;T.fl=null;T.vd=null;T.pt=null;T.nall=0;T.nok=0;T.miss=[];T.cdn='';T.hk='';T.sx=[];T.t0=now;T.tp=now;T.qc=0;
   T.cw=0;T.cur=0;T.tw=0;T.rs=0;T.shk=0;T.sayT=0;T.rqok=0;T.tms=[null,{p:0,st:0,pkn:0,pkg:0,fl:null,pt:null,sx:[],nok:0,nall:0,cw:0,rs:0}];
-  T.plan=L.plan((Math.random()*1e9)|0,T.lv);T.bfin=L.fin(T.plan);T.bi=0;T.bp=0;T.ph='play';
+  T.pool=[];T.plan=L.plan((Math.random()*1e9)|0,T.lv,N);T.bfin=L.fin(T.plan,N);T.bi=0;T.bp=0;T.ph='play';
   [T.gl.p,T.gl.b].forEach(a=>a.forEach(r=>r.forEach(m=>setG(m,0))));
   T.ov.forEach(o=>{o.visible=false});T.sh.forEach(d=>{d.l=0;d.m.visible=false});
   tele(T.ru,PX,zp(0),now);tele(T.bu,PXB,zp(0),now);T.cz=zp(0);
   E.q.className='';E.q.innerHTML='';E.c.className=''}
-function begin(){
+function begin(n){
+  Q=typeof n==='number'?Math.max(4,Math.min(L.NMAX,n|0)):L.clampN(T.n);N=L.petak(Q);
+  if(T.built&&T.bn!==N)destroy();
   mk();labels();
   T.org={bg:S.background,fc:S.fog.color.getHex(),fn:S.fog.near,ff:S.fog.far,fov:cam.fov};
   T.o={x:pl.x,y:pl.y,z:pl.z,yaw:pl.yaw};
@@ -339,7 +374,7 @@ function pick(i){
   const q=T.q,now=performance.now();
   if(!q||q.done||T.ph!=='play'||T.fl||T.vd||now-T.t0<CD*1000||now-T.qs<TAPG)return;
   q.done=true;T.nall++;
-  const pr=T.pr,ok=i===pr.side,r=L.resolve(T.p,T.st,ok),k=T.p;
+  const pr=T.pr,ok=i===pr.side,r=L.resolve(T.p,T.st,ok,N),k=T.p;
   E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;const j=+b.dataset.i;if(j===pr.side){b.classList.add('ok');mark(b,'✔')}else if(j===i){b.classList.add('no');mark(b,'✖')}});
   const pk=E.q.querySelector('.jkpk');if(pk&&pk.remove)pk.remove();
   const f=E.q.querySelector('.jkf');
@@ -355,7 +390,7 @@ function pick(i){
     snd(988,.12,'triangle');vib(r.jump>1?[20,30,40]:20);
     let m='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Maju! '+(r.jump>1?'Lompat 2 petak 💪💪':'+1 petak 💪')+'</b>';
     if(r.jump>1){snd(1319,.14,'triangle');toast('🔥 Beruntun x'+r.st+'!')}
-    if(r.st===3&&!T.pkg){T.pkg=1;T.pkn=1;m+=' <b>👁 Kamu dapat Intip!</b>'}
+    if(r.st===3&&T.pkg<Math.max(1,Math.floor(Q/10))){T.pkg++;T.pkn++;m+=' <b>👁 Kamu dapat Intip!</b>'}
     if(f)f.innerHTML=m;
     if(T.p>=N&&T.pt===null)T.pt=now-T.t0-CD*1000;
     T.nxt=now+(T.p>=N?0:850)}
@@ -408,10 +443,12 @@ function finish(v){
   T.ph='end';T.q=null;T.qb=null;E.q.className='';E.q.innerHTML='';E.c.className='';T.ov.forEach(o=>{o.visible=false});
   if(T.tm){finishTeam(v);return}
   const won=v.win==='p',draw=v.win==='',s=T.sv,first=s.d!==dstr();let b=10;
-  const secs=T.pt===null?null:Math.round(T.pt/100)/10,old=s.best||0,rec=won&&secs!==null&&(old===0||secs<old);
-  const bd0=s.bd&&s.bd.d===dstr()?s.bd.t:0,recD=won&&secs!==null&&(!bd0||secs<bd0);
-  if(recD)s.bd={d:dstr(),t:secs};
-  if(won){b=40;if(first){b+=60;s.d=dstr()}s.win=(s.win||0)+1;if(rec)s.best=secs}
+  /* rekor dipisah per jumlah soal (jembatan pendek dan panjang tidak sebanding) */
+  const nk=String(Q),secs=T.pt===null?null:Math.round(T.pt/100)/10,old=s.bs[nk]||0,rec=won&&secs!==null&&(old===0||secs<old);
+  if(s.bd.d!==dstr())s.bd={d:dstr(),m:{}};
+  const bd0=s.bd.m[nk]||0,recD=won&&secs!==null&&(!bd0||secs<bd0);
+  if(recD)s.bd.m[nk]=secs;
+  if(won){b=40;if(first){b+=60;s.d=dstr()}s.win=(s.win||0)+1;if(rec)s.bs[nk]=secs}
   /* lawan otomatis: 2 menang beruntun naik, 2 kalah beruntun turun */
   let adp='';
   if(s.auto!==0&&!draw){const a=L.adapt(T.lv,s.h,won?'w':'l');s.h=a.h;
@@ -422,7 +459,7 @@ function finish(v){
   const rvw=T.miss.length?`<div class="jkcol" style="border-color:#c62f26"><b style="color:#c62f26">📝 Perlu diulang</b>${T.miss.slice(0,5).map(m=>`<span>${esc(m.q)} → <b${ARX.test(m.a)?' class="ar" lang="ar"':''}>${esc(m.a)}</b></span>`).join('')}${T.miss.length>5?`<span style="opacity:.7">dan ${T.miss.length-5} soal lain</span>`:''}</div>`:'';
   card.innerHTML=`<h2>${ttl}</h2>`+(won?'<div class="ar center" lang="ar" style="font-size:34px;line-height:1.5">أَحْسَنْتَ! مَبْرُوكٌ</div>':'')
    +`<div class="exst"><div><b>${T.p}/${N}</b><small>petakmu</small></div><div><b>${T.bp}/${N}</b><small>🦉 Hud-hud</small></div><div><b>${secs===null?'-':secs+' dtk'}</b><small>waktumu</small></div></div>`
-   +(rec?`<div class="ex">🎉 <b>Rekor baru!</b> ${secs} dtk${old?' (sebelumnya '+old+' dtk)':''}.</div>`:recD?`<div class="ex">⚡ <b>Tercepat hari ini!</b> ${secs} dtk.</div>`:'')
+   +(rec?`<div class="ex">🎉 <b>Rekor baru untuk ${Q} soal!</b> ${secs} dtk${old?' (sebelumnya '+old+' dtk)':''}.</div>`:recD?`<div class="ex">⚡ <b>Tercepat hari ini (${Q} soal)!</b> ${secs} dtk.</div>`:'')
    +(T.rqok?`<div class="ex">🔁 Soal ulang yang berhasil kamu jawab: <b>${T.rqok}</b></div>`:'')+adp
    +`<div class="ex">🪙 +${b+T.nok*2} koin (${T.nok*2} dari jawaban benar${won&&first?', termasuk bonus menang pertama hari ini':''})</div>`
    +(T.nall?`<div class="ex">🎯 Ketepatan: ${T.nok} dari ${T.nall} soal (${Math.round(T.nok*100/T.nall)}%)</div>`:'')
@@ -455,7 +492,7 @@ function tick(now){
           if(T.q&&!T.q.done){const r=1-(now-T.qs)/(L.QT*1000);
             if(T.qb){T.qb.style.transform='scaleX('+Math.max(0,r).toFixed(3)+')';T.qb.parentNode.classList.toggle('lo',r<.3)}
             if(r<=0)tmo()}}
-        const v=T.tm?L.tverdict(T.tw,pos(0),pos(1),ms,DURT):L.verdict(T.pt,T.bfin,T.p,T.bp,ms);
+        const v=T.tm?L.tverdict(T.tw,pos(0),pos(1),ms,dur()):L.verdict(T.pt,T.bfin,T.p,T.bp,ms,dur());
         if(v.ended){const keep=T.tm?!!T.tw:(v.win==='p'&&T.p>=N);
           T.vd=v;T.endAt=now+(keep?900:700);if(!keep){E.q.className='';E.q.innerHTML='';T.q=null;T.qb=null;T.ov.forEach(o=>{o.visible=false})}}}
       if(T.vd&&now>=T.endAt){finish(T.vd);return}}}
