@@ -1,6 +1,15 @@
 # CATATAN PROYEK: Kota Profesi (Miku-game)
 
-Repo: sherlocomp-cyber/Miku-game · dipublish lewat GitHub Pages · struktur: index.html, css/, js/01-30 (js/30 dimuat SEBELUM js/26).
+Repo: sherlocomp-cyber/Miku-game · dipublish lewat GitHub Pages · struktur: index.html, css/, js/01-34 (js/30 dimuat SEBELUM js/26).
+
+## Tugas 2026-11-12: Tim gantian di SEMUA arena (SEDANG DIKERJAKAN)
+Acuan: js/33-jembatan-kaca.js (mode Tim gantian: 2 tim, 1 layar, giliran pindah tiap soal, tanpa koin, kartu "Perlu dibahas bersama").
+- [x] Langkah 1: js/32-tarik-tali.js v4.3 (index.html ?v=62). Tombol "👥 Tim gantian (1 layar)" di kartu pembuka. Data lokal /tali/gt berisi 2 "pemain" gta/gtb, tanpa bot, tanpa Firebase, tanpa koin/rekor. calc() tetap dipakai (Tarik Emas berlaku). Belum diuji di HP.
+- [ ] Langkah 2: js/31-arena-ilmu.js (Lampu Ilmu). Sekarang 2-8 pemain online (solo/duo). Rencana: mode "👥 Tim gantian" 1 layar: tim bergiliran menahan LARI/DIAM untuk pasangan kata di papan; salah gerak = hati tim berkurang; sampai garis finis lebih dulu menang.
+- [ ] Langkah 3: js/19-ujian-akhir.js (Ujian Akhir 40 soal, EXM). Rencana: opsi "Tim gantian" di kartu intro (2 tim, giliran per soal, tiap tim punya pilar/ketinggian sendiri; tanpa Rumah Sakit/koin; tim pertama sampai puncak menang atau skor tertinggi setelah 40 soal).
+- [ ] Langkah 4: naikkan ?v= di index.html untuk file yang berubah; uji semuanya.
+
+Catatan teknis: tidak ada alat tambal untuk repo, jadi tiap perubahan = tulis ulang satu berkas penuh lewat konektor Githubku. Kerjakan satu berkas per langkah.
 
 ## Tugas 2026-11-11: pesan guru + Mode Guru (SELESAI, belum diuji)
 - [x] js/29-pesan-guru.js : siswa yang sedang bermain menerima kartu "Pesan dari Guru" (/pesanGuru/semua atau /pesanGuru/<kelas>)
