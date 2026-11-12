@@ -1,4 +1,4 @@
-/* === BAGIAN 32 (v4.1, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
+/* === BAGIAN 32 (v4.2, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
    Modul mandiri, tidak mengubah file 01-31 (hanya memakai global-nya). Dimuat setelah js/31. Tanpa SDK: REST + EventSource Firebase (sama seperti js/28).
    Permainan: Tim Hijau vs Tim Jingga. Setiap jawaban BENAR = 1 tarikan untuk tim. Selisih tarikan >= 8 = menang; waktu habis (2 menit) = tim terbanyak menang.
    Seri saat waktu habis = TARIK EMAS (tambahan 20 dtk, tarikan pertama yang membuat unggul langsung menang; masih seri sesudahnya = seri). Dihitung di calc() dari data yang sama.
@@ -9,7 +9,9 @@
    Salah / waktu habis = tidak menarik, jeda 2,2 dtk + pembahasan (tidak ada pengurangan). Koin: +2 per tarikan, +40 menang (+60 menang pertama hari ini), +10 ikut. Tidak memanggil rec().
    v4: batas waktu 15 dtk per soal, combo 3 benar beruntun = tarikan bonus +1, pilihan tingkat lawan, tali ikut bergeser, debu kaki, getar kamera,
    peringatan "Ayo tarik!"/"Hampir menang!", bunyi tik 10 dtk terakhir, hasil: ketepatan + kontribusi tim, kamera naik di HP landscape.
-   v4.1: Tarik Emas (perpanjangan saat seri), hitungan combo tampil di pil waktu, penanda "Rekor baru!" di layar hasil.
+   v4.1: Tarik Emas (perpanjangan saat seri), hitungan combo di pil waktu, penanda "Rekor baru!" di layar hasil.
+   v4.2: (1) tanda ✔/✖ di tombol jawaban (tidak mengandalkan warna saja), (2) ketukan dalam 0,25 dtk pertama sesudah soal baru diabaikan
+   (anak sering mengetuk beruntun di posisi yang sama), (3) layar hasil memuat "Perlu diulang": soal yang salah/waktu habis beserta jawaban benarnya.
    UX (v2): skor tim di sisi bar atas, timmu bertanda kuning, hitung mundur menyebut timmu, keluar dengan 2x ketuk (tanpa confirm()), getar di HP.
    Tampilan (v3): pelari berkarakter, tali berpilin, arena pasir bergaris, gawang bendera tim, panggung penonton, pohon, bukit, awan, papan judul.
    Cara balik ke tampilan lama: kembalikan berkas ini dari riwayat git, atau hapus baris <script> js/32 di index.html. */
@@ -19,7 +21,7 @@ if(window.TTI)return;
 if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||typeof P==='undefined'||typeof pl==='undefined'||typeof cam==='undefined'||typeof EXM==='undefined'||typeof EXM.build!=='function'){console.warn('Tali: modul pendukung belum siap');return}
 
 const DB='https://miku-profesi-default-rtdb.asia-southeast1.firebasedatabase.app';
-const TZ=-3600,RX=22,TG=8,DUR=120,OT=20,CD=4,BOTMS=5500,STALE=20000,BEAT=5000,LOCKW=2200,MAXP=8,QT=15;
+const TZ=-3600,RX=22,TG=8,DUR=120,OT=20,CD=4,BOTMS=5500,STALE=20000,BEAT=5000,LOCKW=2200,MAXP=8,QT=15,TAPG=250;
 const LV=['Santai','Normal','Sulit'],BMS=[7500,5500,4000];
 const TC={a:{c:0x2fa56b,h:'#178a55',n:'Tim Hijau',e:'🟢'},b:{c:0xf08a24,h:'#b85c0a',n:'Tim Jingga',e:'🟠'}};
 const ARX=/[\u0600-\u06FF]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -47,14 +49,14 @@ const safe=n=>{n=String(n==null?'':n).replace(/[\u0000-\u001f\u007f<>]/g,' ').re
 
 /* ---------- Status ---------- */
 const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,qc:0,G:null,flag:null,ban:null,pa:[],pb:[],ow:null,crowd:[],cl:[],org:null,o:null,sv:{try:0,win:0,best:0,d:'',lv:1},
-  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,lt:99,wn:0,wm:0,otn:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null};
+  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,miss:[],lt:99,wn:0,wm:0,otn:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null};
 const lsRead=()=>{try{return typeof lsg==='function'?lsg(SKT):localStorage.getItem(SKT)}catch(e){return null}};
 try{Object.assign(T.sv,jp(lsRead()||'{}')||{})}catch(e){}
 T.lv=num(T.sv.lv,0,2,1);
 const persist=()=>{try{typeof lss==='function'?lss(SKT,JSON.stringify(T.sv)):localStorage.setItem(SKT,JSON.stringify(T.sv))}catch(e){}};
 const nowS=()=>Date.now()-(T.off||0);
 const E={};
-const rstat=()=>{T.st=0;T.nok=0;T.nall=0;T.lt=99;T.wn=0;T.wm=0;T.otn=0;T.la=0;T.lb=0};
+const rstat=()=>{T.st=0;T.nok=0;T.nall=0;T.miss=[];T.lt=99;T.wn=0;T.wm=0;T.otn=0;T.la=0;T.lb=0};
 
 /* ---------- Logika murni: dari data ruang -> keadaan pertandingan ---------- */
 function calc(tr,now){
@@ -103,6 +105,7 @@ button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .tto button{min-height:48px;font:700 clamp(15px,3vw,19px)/1.2 "Baloo 2",system-ui,sans-serif;border:3px solid #1d2b53;border-radius:14px;background:#ffcf3f;color:#1d2b53;cursor:pointer;padding:6px 10px;text-align:left;display:flex;gap:8px;align-items:center;box-shadow:0 3px 0 #b8902a}
 .tto button.ar{font-family:Amiri,"Noto Naskh Arabic",serif;font-size:clamp(20px,4vw,26px);direction:rtl;text-align:right}
 .tto button.ok{background:#178a55;color:#fff;box-shadow:0 3px 0 #0e5c38}.tto button.no{background:#c62f26;color:#fff;box-shadow:0 3px 0 #86201a}
+.tto button.ok i,.tto button.no i{background:#fff;color:#1d2b53}
 .tto button:disabled{cursor:default}
 .tto button:focus-visible,.tsp:focus-visible,.ttp:focus-visible,.ttlv button:focus-visible{outline:4px solid #1d2b53;outline-offset:2px}
 .tto i{font-style:normal;background:#1d2b53;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-grid;place-items:center;font-size:13px;flex:none}
@@ -295,19 +298,25 @@ function ask(){
    +q.o.map((x,k)=>`<button type="button" data-i="${k}" class="${ARX.test(x)?'ar':''}"><i aria-hidden="true">${k+1}</i><span>${x}</span></button>`).join('')+'</div><div class="ttf" role="status" aria-live="polite"></div>';
   T.qb=E.q.querySelector('.ttqt i');
   if(q.q.indexOf('🎧')>=0&&q.sp)say(q.sp)}
+/* tanda ✔/✖ pada nomor tombol (supaya hasil tidak hanya dibedakan oleh warna) */
+const mark=(b,s)=>{const n=b.querySelector('i');if(n)n.textContent=s};
+/* catat soal yang salah/waktu habis untuk "Perlu diulang" di layar hasil */
+const miss=q=>{if(T.miss.length<8)T.miss.push({q:String(q.q).replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim(),a:String(q.o[q.c])})};
 function pick(i){
-  const q=T.q;if(!q||q.done||T.ph!=='play'||!T.c||T.c.el<0)return;q.done=true;const ok=i===q.c;T.nall++;
-  E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;const k=+b.dataset.i;if(k===q.c)b.classList.add('ok');else if(k===i)b.classList.add('no')});
+  const q=T.q;if(!q||q.done||T.ph!=='play'||!T.c||T.c.el<0)return;
+  if(performance.now()-T.qs<TAPG)return;
+  q.done=true;const ok=i===q.c;T.nall++;
+  E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;const k=+b.dataset.i;if(k===q.c){b.classList.add('ok');mark(b,'✔')}else if(k===i){b.classList.add('no');mark(b,'✖')}});
   const f=E.q.querySelector('.ttf');
   if(ok){T.nok++;T.st++;const g=T.st%3===0?2:1;T.my+=g;coins+=2*g;hud();me();snd(988,.12,'triangle');vib(g>1?[20,30,40]:20);T.pull=performance.now();
     if(g>1){snd(1319,.14,'triangle');toast('🔥 Beruntun x'+T.st+'!');f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Beruntun x'+T.st+'! Tarik +2 💪💪</b>'}
     else f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Tarik! +1 💪</b>';
     T.nxt=performance.now()+900}
-  else{T.st=0;snd(180,.25,'sawtooth');vib([60,40]);
+  else{T.st=0;miss(q);snd(180,.25,'sawtooth');vib([60,40]);
     f.innerHTML='<b style="color:#b8352b">🦉 Belum tepat.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';T.nxt=performance.now()+LOCKW+(q.ex?800:0)}}
 function tmo(){
-  const q=T.q;if(!q||q.done)return;q.done=true;T.st=0;T.nall++;
-  E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;if(+b.dataset.i===q.c)b.classList.add('ok')});
+  const q=T.q;if(!q||q.done)return;q.done=true;T.st=0;T.nall++;miss(q);
+  E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;if(+b.dataset.i===q.c){b.classList.add('ok');mark(b,'✔')}});
   const f=E.q.querySelector('.ttf');if(f)f.innerHTML='<b style="color:#b8352b">⏰ Waktu habis.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';
   snd(180,.25,'sawtooth');vib([60,40]);T.nxt=performance.now()+LOCKW+(q.ex?800:0)}
 function finish(c){
@@ -321,12 +330,13 @@ function finish(c){
   const ttl=!T.played?'🪢 Pertandingan selesai':won?'🏆 Timmu menang!':draw?'🤝 Seri!':'🦉 Belum menang';
   const mem=c.L[T.tm].slice().sort((x,y)=>y.c-x.c).slice(0,5),medal=['🥇','🥈','🥉'];
   const ctb=T.played&&mem.length>1?`<div class="ttcol ttcn" style="border-color:${TC[T.tm].h}"><b style="color:${TC[T.tm].h}">Kontribusi ${TC[T.tm].n}</b>${mem.map((x,k)=>`<span>${medal[k]||'▫️'} ${esc(x.n)}${x.k===dev?' (kamu)':''}: ${x.c} tarikan</span>`).join('')}</div>`:'';
+  const rvw=T.played&&T.miss.length?`<div class="ttcol ttcn" style="border-color:#c62f26"><b style="color:#c62f26">📝 Perlu diulang</b>${T.miss.slice(0,5).map(m=>`<span>${esc(m.q)} → <b${ARX.test(m.a)?' class="ar" lang="ar"':''}>${esc(m.a)}</b></span>`).join('')}${T.miss.length>5?`<span class="ttm">dan ${T.miss.length-5} soal lain</span>`:''}</div>`:'';
   card.innerHTML=`<h2>${ttl}</h2>`+(won?'<div class="ar center" lang="ar" style="font-size:34px;line-height:1.5">أَحْسَنْتَ! مَبْرُوكٌ</div>':'')
    +`<div class="exst"><div><b style="color:${TC.a.h}">${c.a}</b><small>${TC.a.e} ${TC.a.n}</small></div><div><b style="color:${TC.b.h}">${c.b}</b><small>${TC.b.e} ${TC.b.n}</small></div><div><b>${T.my}</b><small>tarikanmu</small></div></div>`
    +(rec?`<div class="ex">🎉 <b>Rekor baru!</b> ${T.my} tarikan (sebelumnya ${old}).</div>`:'')
    +(T.played?`<div class="ex">🪙 +${b+T.my*2} koin (${T.my*2} dari jawaban benar${won&&first?', termasuk bonus menang pertama hari ini':''})</div>`:'')
    +(T.played&&T.nall?`<div class="ex">🎯 Ketepatan: ${T.nok} dari ${T.nall} soal (${Math.round(T.nok*100/T.nall)}%)</div>`:'')
-   +ctb
+   +ctb+rvw
    +(won?'':'<div class="fc">Tidak apa-apa! Perhatikan pembahasan setiap soal, lalu coba lagi bersama timmu.</div>')
    +'<div class="exbt"><button class="opt go" id="ttag" type="button">🔁 Main lagi</button><button class="opt" id="ttcl" type="button">✖ Tutup</button></div>';
   $('#ttag').onclick=()=>{modal(false);T.ph='lobby';T.ck='';T.cdn='';T.fin=null;const n=calc(T.tree,nowS());if(!n.m||n.ended)start()};
