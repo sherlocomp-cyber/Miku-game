@@ -1,4 +1,4 @@
-/* === BAGIAN 32 (v4.2, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
+/* === BAGIAN 32 (v4.3, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
    Modul mandiri, tidak mengubah file 01-31 (hanya memakai global-nya). Dimuat setelah js/31. Tanpa SDK: REST + EventSource Firebase (sama seperti js/28).
    Permainan: Tim Hijau vs Tim Jingga. Setiap jawaban BENAR = 1 tarikan untuk tim. Selisih tarikan >= 8 = menang; waktu habis (2 menit) = tim terbanyak menang.
    Seri saat waktu habis = TARIK EMAS (tambahan 20 dtk, tarikan pertama yang membuat unggul langsung menang; masih seri sesudahnya = seri). Dihitung di calc() dari data yang sama.
@@ -12,6 +12,9 @@
    v4.1: Tarik Emas (perpanjangan saat seri), hitungan combo di pil waktu, penanda "Rekor baru!" di layar hasil.
    v4.2: (1) tanda ✔/✖ di tombol jawaban (tidak mengandalkan warna saja), (2) ketukan dalam 0,25 dtk pertama sesudah soal baru diabaikan
    (anak sering mengetuk beruntun di posisi yang sama), (3) layar hasil memuat "Perlu diulang": soal yang salah/waktu habis beserta jawaban benarnya.
+   v4.3: mode TIM GANTIAN (seperti Jembatan Kaca): satu layar, Tim Hijau dan Tim Jingga bergiliran menjawab satu soal. Benar = tarik (beruntun 3 = +2),
+   salah/waktu habis = tidak menarik, giliran pindah. Tanpa internet, tanpa koin, tanpa rekor. Memakai calc() yang sama: data ruang lokal /tali/gt
+   berisi dua "pemain" (gta, gtb) dan tidak ada bot. Tarik Emas tetap berlaku. Dipilih dari kartu pembuka ("👥 Tim gantian").
    UX (v2): skor tim di sisi bar atas, timmu bertanda kuning, hitung mundur menyebut timmu, keluar dengan 2x ketuk (tanpa confirm()), getar di HP.
    Tampilan (v3): pelari berkarakter, tali berpilin, arena pasir bergaris, gawang bendera tim, panggung penonton, pohon, bukit, awan, papan judul.
    Cara balik ke tampilan lama: kembalikan berkas ini dari riwayat git, atau hapus baris <script> js/32 di index.html. */
@@ -49,7 +52,8 @@ const safe=n=>{n=String(n==null?'':n).replace(/[\u0000-\u001f\u007f<>]/g,' ').re
 
 /* ---------- Status ---------- */
 const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,qc:0,G:null,flag:null,ban:null,pa:[],pb:[],ow:null,crowd:[],cl:[],org:null,o:null,sv:{try:0,win:0,best:0,d:'',lv:1},
-  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,miss:[],lt:99,wn:0,wm:0,otn:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null};
+  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,miss:[],lt:99,wn:0,wm:0,otn:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null,
+  gt:0,gs:null};
 const lsRead=()=>{try{return typeof lsg==='function'?lsg(SKT):localStorage.getItem(SKT)}catch(e){return null}};
 try{Object.assign(T.sv,jp(lsRead()||'{}')||{})}catch(e){}
 T.lv=num(T.sv.lv,0,2,1);
@@ -110,6 +114,8 @@ button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .tto button:focus-visible,.tsp:focus-visible,.ttp:focus-visible,.ttlv button:focus-visible{outline:4px solid #1d2b53;outline-offset:2px}
 .tto i{font-style:normal;background:#1d2b53;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-grid;place-items:center;font-size:13px;flex:none}
 .ttf{min-height:20px;margin-top:6px;font-size:14px}
+.tttn{display:inline-block;border:3px solid #1d2b53;border-radius:999px;padding:2px 12px;margin-bottom:6px;font-size:15px;font-weight:800;color:#fff}
+.tttn.ta{background:#178a55}.tttn.tb{background:#b85c0a}
 #ttc{position:fixed;inset:0;z-index:7;align-items:center;justify-content:center;pointer-events:none;text-align:center;font:800 min(22vw,150px)/1.05 "Baloo 2",system-ui,sans-serif;color:#fff;-webkit-text-stroke:6px #1d2b53;paint-order:stroke fill}
 #ttc.on{display:flex;flex-direction:column;animation:ttpop .45s ease-out}
 #ttc.sm{font-size:min(9vw,56px);-webkit-text-stroke:4px #1d2b53;justify-content:flex-start;padding-top:22vh}
@@ -219,7 +225,11 @@ function put(path,mkv){
   setPath(path,mkv(nowS()));
   if(!T.net)return;
   fetch(DB+'/tali/'+T.room+'/'+path+'.json',{method:'PUT',body:JSON.stringify(mkv(SVT)),headers:{'Content-Type':'application/json'}}).catch(()=>{})}
-function me(){const nm=safe(NMX()),mid=T.mid||'';put('p/'+dev,t=>({n:nm,tm:T.tm,c:T.my,mid,t}))}
+/* mode Tim gantian: data hanya lokal (net=false), dua "pemain" gta/gtb mewakili dua tim, supaya calc() yang sama bisa dipakai */
+function me(){
+  const mid=T.mid||'';
+  if(T.gt){[['gta','a'],['gtb','b']].forEach(([k,tm])=>put('p/'+k,tt=>({n:TC[tm].n,tm,c:T.gs?T.gs[tm]:0,mid,t:tt})));return}
+  const nm=safe(NMX());put('p/'+dev,t=>({n:nm,tm:T.tm,c:T.my,mid,t}))}
 function bye(){if(!T.net||!T.joined)return;try{fetch(DB+'/tali/'+T.room+'/p/'+dev+'.json',{method:'PUT',body:JSON.stringify({n:safe(NMX()),tm:T.tm,c:T.my,mid:T.mid,off:1,t:SVT}),headers:{'Content-Type':'application/json'},keepalive:true}).catch(()=>{})}catch(e){}}
 function joined(){if(T.joined)return;T.joined=true;clearTimeout(T.ct);T.tm='a';me();T.ph='lobby';T.ck=''}
 function rebalance(){
@@ -249,19 +259,29 @@ function intro(){
    +'<div class="exrw"><b>👫</b><span><b>Bareng teman sekelas</b>: ruang dibuat dari kelas di akhir namamu (misalnya “Ahmad 4A”). Tim dibagi otomatis.</span></div>'
    +'<div class="exrw"><b>🦉</b><span><b>Sendirian?</b> Lawanmu Kak Hud-hud, tingkatnya bisa dipilih di lobi. Salah tidak mengurangi tarikan, tapi kamu menunggu sebentar.</span></div>'
    +`<div class="exrw"><b>🔥</b><span><b>Cepat dan beruntun!</b> Tiap soal ada waktu ${QT} detik. Jawab benar 3 kali berturut-turut, dapat tarikan bonus.</span></div>`
-   +'<div class="exbt"><button class="opt go" id="ttgo0" type="button">▶ Masuk lobi</button><button class="opt" id="ttno0" type="button">✖ Nanti saja</button></div>';
-  $('#ttgo0').onclick=begin;$('#ttno0').onclick=()=>{modal(false);open=false;mode=null}}
-function begin(){
+   +'<div class="exrw"><b>👥</b><span><b>Tim gantian</b>: dua tim bergiliran menjawab di satu layar (cocok diproyeksikan ke kelas). Giliran pindah setelah tiap soal. Tanpa internet dan tanpa koin.</span></div>'
+   +'<div class="exbt"><button class="opt go" id="ttgo0" type="button">▶ Masuk lobi</button><button class="opt" id="ttgt" type="button">👥 Tim gantian (1 layar)</button><button class="opt" id="ttno0" type="button">✖ Nanti saja</button></div>';
+  $('#ttgo0').onclick=()=>begin(0);$('#ttgt').onclick=()=>begin(1);$('#ttno0').onclick=()=>{modal(false);open=false;mode=null}}
+function begin(gt){
   mk();
   T.org={bg:S.background,fc:S.fog.color.getHex(),fn:S.fog.near,ff:S.fog.far,fov:cam.fov};
   T.o={x:pl.x,y:pl.y,z:pl.z,yaw:pl.yaw};
   T.G.visible=true;T.on=true;open=true;mode='tali';document.body.classList.add('tli');P.visible=false;
   S.background=new THREE.Color(0xa8dcff);S.fog.color.setHex(0xa8dcff);S.fog.near=140;S.fog.far=560;cam.fov=55;cam.updateProjectionMatrix();
   pl.x=0;pl.y=0;pl.z=TZ;pl.yaw=0;pl.vy=0;
-  T.sv.try=(T.sv.try||0)+1;persist();T.tp=performance.now();T.fx=0;T.mid='';T.my=0;T.fin=null;T.q=null;T.played=false;T.hk='';T.cdn='';rstat();
-  connect()}
+  T.gt=gt?1:0;T.gs=null;
+  if(!T.gt){T.sv.try=(T.sv.try||0)+1;persist()}
+  T.tp=performance.now();T.fx=0;T.mid='';T.my=0;T.fin=null;T.q=null;T.played=false;T.hk='';T.cdn='';rstat();
+  if(T.gt){T.net=false;T.joined=true;T.offOk=false;T.off=0;T.tree={};T.room='gt';T.tm='a';T.ph='lobby';startGt()}
+  else connect()}
+/* mode Tim gantian: pertandingan lokal, tanpa bot, tanpa koin */
+function startGt(){
+  const id=Math.random().toString(36).slice(2,8);
+  T.gs={a:0,b:0,st:{a:0,b:0},ok:{a:0,b:0},al:{a:0,b:0}};
+  T.gt=1;T.tm='a';T.mid=id;T.my=0;T.fin=null;T.played=true;T.q=null;T.nxt=0;T.cdn='';T.hk='';rstat();
+  put('m',t=>({id,t,b:0,tg:TG,dur:DUR,bm:BOTMS}));me()}
 function leave(){
-  const was=T.on;qreset();bye();T.on=false;T.ph='idle';clearTimeout(T.ct);clearTimeout(T.tt);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
+  const was=T.on;qreset();bye();T.on=false;T.ph='idle';T.gt=0;T.gs=null;clearTimeout(T.ct);clearTimeout(T.tt);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
   E.c.className='';E.q.className='';E.q.innerHTML='';T.qb=null;E.h.classList.remove('near');E.t.classList.remove('ot');
   if(was){
     const o=T.org;if(o){S.background=o.bg;S.fog.color.setHex(o.fc);S.fog.near=o.fn;S.fog.far=o.ff;cam.fov=o.fov;cam.updateProjectionMatrix()}
@@ -294,7 +314,7 @@ function nextQ(){
   const q=T.pool[i<0?0:i];q.u=1;return q}
 function ask(){
   const q=T.q=nextQ();E.q.className='on';T.qs=performance.now();
-  E.q.innerHTML=`<div class="ttqt" aria-hidden="true"><i></i></div><div class="ttq1">${q.sp?'<button class="tsp" type="button" aria-label="Dengarkan">🔊</button>':''}${q.q}</div><div class="tto">`
+  E.q.innerHTML=(T.gt?`<span class="tttn t${T.tm}">${TC[T.tm].e} Giliran: ${TC[T.tm].n}</span>`:'')+`<div class="ttqt" aria-hidden="true"><i></i></div><div class="ttq1">${q.sp?'<button class="tsp" type="button" aria-label="Dengarkan">🔊</button>':''}${q.q}</div><div class="tto">`
    +q.o.map((x,k)=>`<button type="button" data-i="${k}" class="${ARX.test(x)?'ar':''}"><i aria-hidden="true">${k+1}</i><span>${x}</span></button>`).join('')+'</div><div class="ttf" role="status" aria-live="polite"></div>';
   T.qb=E.q.querySelector('.ttqt i');
   if(q.q.indexOf('🎧')>=0&&q.sp)say(q.sp)}
@@ -306,21 +326,40 @@ function pick(i){
   const q=T.q;if(!q||q.done||T.ph!=='play'||!T.c||T.c.el<0)return;
   if(performance.now()-T.qs<TAPG)return;
   q.done=true;const ok=i===q.c;T.nall++;
+  if(T.gt)T.gs.al[T.tm]++;
   E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;const k=+b.dataset.i;if(k===q.c){b.classList.add('ok');mark(b,'✔')}else if(k===i){b.classList.add('no');mark(b,'✖')}});
   const f=E.q.querySelector('.ttf');
-  if(ok){T.nok++;T.st++;const g=T.st%3===0?2:1;T.my+=g;coins+=2*g;hud();me();snd(988,.12,'triangle');vib(g>1?[20,30,40]:20);T.pull=performance.now();
+  if(ok){T.nok++;let g;
+    if(T.gt){const tm=T.tm,gs=T.gs;gs.ok[tm]++;gs.st[tm]++;T.st=gs.st[tm];g=T.st%3===0?2:1;gs[tm]+=g}
+    else{T.st++;g=T.st%3===0?2:1;T.my+=g;coins+=2*g;hud()}
+    me();snd(988,.12,'triangle');vib(g>1?[20,30,40]:20);T.pull=performance.now();
     if(g>1){snd(1319,.14,'triangle');toast('🔥 Beruntun x'+T.st+'!');f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Beruntun x'+T.st+'! Tarik +2 💪💪</b>'}
     else f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Tarik! +1 💪</b>';
     T.nxt=performance.now()+900}
-  else{T.st=0;miss(q);snd(180,.25,'sawtooth');vib([60,40]);
+  else{if(T.gt)T.gs.st[T.tm]=0;T.st=0;miss(q);snd(180,.25,'sawtooth');vib([60,40]);
     f.innerHTML='<b style="color:#b8352b">🦉 Belum tepat.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';T.nxt=performance.now()+LOCKW+(q.ex?800:0)}}
 function tmo(){
   const q=T.q;if(!q||q.done)return;q.done=true;T.st=0;T.nall++;miss(q);
+  if(T.gt){T.gs.al[T.tm]++;T.gs.st[T.tm]=0}
   E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;if(+b.dataset.i===q.c){b.classList.add('ok');mark(b,'✔')}});
   const f=E.q.querySelector('.ttf');if(f)f.innerHTML='<b style="color:#b8352b">⏰ Waktu habis.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';
   snd(180,.25,'sawtooth');vib([60,40]);T.nxt=performance.now()+LOCKW+(q.ex?800:0)}
+/* layar hasil mode Tim gantian: tanpa koin dan tanpa rekor */
+function finishGt(c){
+  const gs=T.gs,card=$('#card');modal(true);card.scrollTop=0;
+  const ttl=c.win==='a'?'🟢 Tim Hijau menang!':c.win==='b'?'🟠 Tim Jingga menang!':'🤝 Seri!';
+  const pc=t=>gs.al[t]?Math.round(gs.ok[t]*100/gs.al[t])+'%':'-';
+  const rvw=T.miss.length?`<div class="ttcol ttcn" style="border-color:#c62f26"><b style="color:#c62f26">📝 Perlu dibahas bersama</b>${T.miss.slice(0,5).map(m=>`<span>${esc(m.q)} → <b${ARX.test(m.a)?' class="ar" lang="ar"':''}>${esc(m.a)}</b></span>`).join('')}${T.miss.length>5?`<span class="ttm">dan ${T.miss.length-5} soal lain</span>`:''}</div>`:'';
+  card.innerHTML=`<h2>${ttl}</h2>`+(c.win?'<div class="ar center" lang="ar" style="font-size:34px;line-height:1.5">أَحْسَنْتُمْ! مَبْرُوكٌ</div>':'')
+   +`<div class="exst"><div><b style="color:${TC.a.h}">${c.a}</b><small>${TC.a.e} ${TC.a.n} (${pc('a')})</small></div><div><b style="color:${TC.b.h}">${c.b}</b><small>${TC.b.e} ${TC.b.n} (${pc('b')})</small></div></div>`
+   +rvw+'<div class="fc">Beri tepuk tangan untuk kedua tim! Bahas soal yang salah bersama-sama.</div>'
+   +'<div class="exbt"><button class="opt go" id="ttag" type="button">🔁 Main lagi</button><button class="opt" id="ttcl" type="button">✖ Tutup</button></div>';
+  $('#ttag').onclick=()=>{modal(false);T.ph='lobby';T.ck='';startGt()};
+  $('#ttcl').onclick=leave;
+  if(c.win){vib([40,40,40,40,120]);confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
 function finish(c){
   T.ph='end';T.fin=c;T.q=null;T.qb=null;E.q.className='';E.q.innerHTML='';E.c.className='';E.h.classList.remove('near');E.t.classList.remove('ot');
+  if(T.gt){finishGt(c);return}
   const won=c.win===T.tm,draw=c.win==='',s=T.sv,first=s.d!==dstr();let b=10;
   const old=s.best||0,rec=T.played&&T.my>old&&T.my>0;
   if(T.played){
@@ -352,7 +391,7 @@ function hudUpd(c){
   E.m.style.left=(50-c.pos*50)+'%';E.a.textContent=la;E.b.textContent=lb;
   E.h.classList.toggle('near',Math.abs(c.pos)>=.7);
   E.a.classList.toggle('me',T.tm==='a');E.b.classList.toggle('me',T.tm==='b');
-  E.a.setAttribute('aria-label',TC.a.n+' '+c.a+' tarikan'+(T.tm==='a'?', timmu':''));E.b.setAttribute('aria-label',TC.b.n+' '+c.b+' tarikan'+(T.tm==='b'?', timmu':''))}
+  E.a.setAttribute('aria-label',TC.a.n+' '+c.a+' tarikan'+(T.tm==='a'?(T.gt?', giliran sekarang':', timmu'):''));E.b.setAttribute('aria-label',TC.b.n+' '+c.b+' tarikan'+(T.tm==='b'?(T.gt?', giliran sekarang':', timmu'):''))}
 function tick(now){
   const c=T.c=calc(T.tree,nowS());
   if(T.joined&&now-T.hb>BEAT){T.hb=now;me()}
@@ -363,17 +402,18 @@ function tick(now){
   if(T.ph==='play'){
     if(c.ended){finish(c);return}
     const s=c.el<0?String(Math.ceil(-c.el)):(c.el<.9?'MULAI!':'');
-    if(s!==T.cdn){T.cdn=s;if(s){flash(s+(c.el<0?'<small>Kamu di '+TC[T.tm].e+' '+TC[T.tm].n+'</small>':''),0);snd(c.el<0?440:880,.12,'triangle')}else E.c.className=''}
+    if(s!==T.cdn){T.cdn=s;if(s){flash(s+(c.el<0?'<small>'+(T.gt?'Giliran pertama: ':'Kamu di ')+TC[T.tm].e+' '+TC[T.tm].n+'</small>':''),0);snd(c.el<0?440:880,.12,'triangle')}else E.c.className=''}
     if(c.el>=0){
-      if(T.q&&T.q.done&&now>=T.nxt)T.q=null;
+      if(T.q&&T.q.done&&now>=T.nxt){T.q=null;if(T.gt){T.tm=T.tm==='a'?'b':'a';T.st=T.gs?T.gs.st[T.tm]:0;T.hk='';toast(TC[T.tm].e+' Giliran '+TC[T.tm].n)}}
       if(!T.q&&now>=T.nxt)ask();
       if(T.q&&!T.q.done){const r=1-(now-T.qs)/(QT*1000);
         if(T.qb){T.qb.style.transform='scaleX('+Math.max(0,r).toFixed(3)+')';T.qb.parentNode.classList.toggle('lo',r<.3)}
         if(r<=0)tmo()}
       if(c.ot&&!T.otn){T.otn=1;toast('⚡ Tarik Emas! Tarikan berikutnya menang');vib([60,40,60]);snd(1175,.18,'triangle')}
       const mp=c.pos*(T.tm==='a'?1:-1);
-      if(mp<=-.7){if(!T.wn){T.wn=1;toast('💪 Ayo tarik!')}}else if(mp>-.4)T.wn=0;
-      if(mp>=.7){if(!T.wm){T.wm=1;toast('🔥 Hampir menang!')}}else if(mp<.4)T.wm=0}
+      if(!T.gt){
+        if(mp<=-.7){if(!T.wn){T.wn=1;toast('💪 Ayo tarik!')}}else if(mp>-.4)T.wn=0;
+        if(mp>=.7){if(!T.wm){T.wm=1;toast('🔥 Hampir menang!')}}else if(mp<.4)T.wm=0}}
     else if(E.q.className){E.q.className='';E.q.innerHTML='';T.q=null;T.qb=null}}
   hudUpd(c)}
 function puff(t){
