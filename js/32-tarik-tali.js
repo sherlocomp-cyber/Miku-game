@@ -1,14 +1,16 @@
-/* === BAGIAN 32 (v3, percantik): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
+/* === BAGIAN 32 (v4, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
    Modul mandiri, tidak mengubah file 01-31 (hanya memakai global-nya). Dimuat setelah js/31. Tanpa SDK: REST + EventSource Firebase (sama seperti js/28).
    Permainan: Tim Hijau vs Tim Jingga. Setiap jawaban BENAR = 1 tarikan untuk tim. Selisih tarikan >= 8 = menang; waktu habis (2 menit) = tim terbanyak menang.
    Bareng-bareng: ruang = kelas dari akhir nama murid ("Ahmad 4A" -> "4a"), sama seperti Teman Online. Tim dibagi seimbang otomatis.
-   Sendirian (atau 1 tim kosong): lawannya Kak Hud-hud (bot, 1 tarikan tiap 5,5 detik, dihitung dari jam server sehingga semua perangkat sama).
-   Tanpa internet: otomatis main sendiri melawan Kak Hud-hud.
-   Data: /tali/<ruang>/m = {id,t,b,tg,dur} dan /tali/<ruang>/p/<id-perangkat> = {n,tm,c,mid,t,off}. Posisi tali = (tarikan A - tarikan B) / 8, dihitung lokal dari data yang sama (tanpa "host").
-   Salah = tidak menarik, jeda 2,2 dtk + pembahasan (tidak ada pengurangan). Koin: +2 per jawaban benar, +40 menang (+60 menang pertama hari ini), +10 ikut. Tidak memanggil rec().
-   UX (v2): skor tim di sisi bar atas (nama pemain hanya di lobi/hasil), timmu bertanda kuning, hitung mundur menyebut timmu, keluar dengan 2x ketuk (tanpa confirm()), getar di HP.
-   Tampilan (v3): pelari berkarakter (lengan memegang tali, kaki melangkah, badan miring ke belakang, label nama), tali berpilin, arena pasir bergaris, gawang bendera tim,
-   panggung penonton yang bersorak mendukung tim, pohon, bukit, awan, papan judul. Logika permainan & data TIDAK berubah dari v2.
+   Sendirian (atau 1 tim kosong): lawannya Kak Hud-hud (bot). Kecepatan bot dipilih di lobi (Santai 7,5 dtk / Normal 5,5 dtk / Sulit 4 dtk per tarikan),
+   disimpan di /tali/<ruang>/m.bm dan dihitung dari jam server sehingga semua perangkat sama. Tanpa internet: otomatis main sendiri melawan Kak Hud-hud.
+   Data: /tali/<ruang>/m = {id,t,b,tg,dur,bm} dan /tali/<ruang>/p/<id-perangkat> = {n,tm,c,mid,t,off}. Posisi tali = (tarikan A - tarikan B) / 8, dihitung lokal dari data yang sama (tanpa "host").
+   Salah / waktu habis = tidak menarik, jeda 2,2 dtk + pembahasan (tidak ada pengurangan). Koin: +2 per tarikan, +40 menang (+60 menang pertama hari ini), +10 ikut. Tidak memanggil rec().
+   Baru di v4: (1) batas waktu 15 dtk per soal (bar waktu), (2) combo: 3 jawaban benar beruntun = tarikan bonus +1, (3) pilihan tingkat lawan di lobi,
+   (4) tali ikut bergeser bersama pelari, debu kaki, getar kamera, pelari lawan/bot ikut tersentak saat menarik, (5) peringatan "Ayo tarik!" / "Hampir menang!" + bar berdenyut,
+   (6) bunyi tik 10 detik terakhir, (7) hasil: ketepatan jawaban + kontribusi tiap anggota tim, (8) kamera naik di HP landscape agar arena tidak tertutup panel soal.
+   UX (v2): skor tim di sisi bar atas, timmu bertanda kuning, hitung mundur menyebut timmu, keluar dengan 2x ketuk (tanpa confirm()), getar di HP.
+   Tampilan (v3): pelari berkarakter, tali berpilin, arena pasir bergaris, gawang bendera tim, panggung penonton, pohon, bukit, awan, papan judul.
    Cara balik ke tampilan lama: kembalikan berkas ini dari riwayat git, atau hapus baris <script> js/32 di index.html. */
 (function(){
 'use strict';
@@ -16,7 +18,8 @@ if(window.TTI)return;
 if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||typeof P==='undefined'||typeof pl==='undefined'||typeof cam==='undefined'||typeof EXM==='undefined'||typeof EXM.build!=='function'){console.warn('Tali: modul pendukung belum siap');return}
 
 const DB='https://miku-profesi-default-rtdb.asia-southeast1.firebasedatabase.app';
-const TZ=-3600,RX=22,TG=8,DUR=120,CD=4,BOTMS=5500,STALE=20000,BEAT=5000,LOCKW=2200,MAXP=8;
+const TZ=-3600,RX=22,TG=8,DUR=120,CD=4,BOTMS=5500,STALE=20000,BEAT=5000,LOCKW=2200,MAXP=8,QT=15;
+const LV=['Santai','Normal','Sulit'],BMS=[7500,5500,4000];
 const TC={a:{c:0x2fa56b,h:'#178a55',n:'Tim Hijau',e:'🟢'},b:{c:0xf08a24,h:'#b85c0a',n:'Tim Jingga',e:'🟠'}};
 const ARX=/[\u0600-\u06FF]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const SKT=SK+':tali',SVT={'.sv':'timestamp'};
@@ -42,12 +45,15 @@ function lolos(t){t=String(t||'');
 const safe=n=>{n=String(n==null?'':n).replace(/[\u0000-\u001f\u007f<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,16);return n&&lolos(n)?n:'Teman'};
 
 /* ---------- Status ---------- */
-const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,qc:0,G:null,flag:null,ban:null,pa:[],pb:[],ow:null,crowd:[],cl:[],org:null,o:null,sv:{try:0,win:0,best:0,d:''}};
+const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,qc:0,G:null,flag:null,ban:null,pa:[],pb:[],ow:null,crowd:[],cl:[],org:null,o:null,sv:{try:0,win:0,best:0,d:'',lv:1},
+  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,lt:99,wn:0,wm:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null};
 const lsRead=()=>{try{return typeof lsg==='function'?lsg(SKT):localStorage.getItem(SKT)}catch(e){return null}};
 try{Object.assign(T.sv,jp(lsRead()||'{}')||{})}catch(e){}
+T.lv=num(T.sv.lv,0,2,1);
 const persist=()=>{try{typeof lss==='function'?lss(SKT,JSON.stringify(T.sv)):localStorage.setItem(SKT,JSON.stringify(T.sv))}catch(e){}};
 const nowS=()=>Date.now()-(T.off||0);
 const E={};
+const rstat=()=>{T.st=0;T.nok=0;T.nall=0;T.lt=99;T.wn=0;T.wm=0;T.la=0;T.lb=0};
 
 /* ---------- Logika murni: dari data ruang -> keadaan pertandingan ---------- */
 function calc(tr,now){
@@ -58,7 +64,8 @@ function calc(tr,now){
     if(mine)r[t]+=num(d.c,0,999,0)});
   if(m){
     r.tg=num(m.tg,3,30,TG);r.dur=num(m.dur,20,600,DUR);r.el=(now-num(m.t,0,9e15,0))/1000-CD;
-    if(r.bot&&r.el>0)r.b+=Math.floor(Math.min(r.el,r.dur)*1000/BOTMS);
+    const bm=num(m.bm,2500,12000,BOTMS);
+    if(r.bot&&r.el>0)r.b+=Math.floor(Math.min(r.el,r.dur)*1000/bm);
     const df=r.a-r.b;r.pos=Math.max(-1,Math.min(1,df/r.tg));
     if(Math.abs(df)>=r.tg){r.ended=true;r.win=df>0?'a':'b'}
     else if(r.el>=r.dur){r.ended=true;r.win=df>0?'a':df<0?'b':''}}
@@ -76,10 +83,15 @@ button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .ttbar{flex:1;height:24px;border:3px solid #1d2b53;border-radius:999px;position:relative;overflow:hidden;background:linear-gradient(90deg,#2fa56b 50%,#f08a24 50%);box-shadow:0 3px 0 rgba(29,43,83,.35)}
 .ttbar:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 6px,transparent 6px 12px)}
 .ttbar i{position:absolute;top:-2px;bottom:-2px;left:50%;width:12px;margin-left:-6px;background:#fff;border:3px solid #1d2b53;border-radius:6px;transition:left .25s}
+#tth.near .ttbar{animation:ttnear .5s infinite alternate}
+@keyframes ttnear{to{box-shadow:0 0 0 4px #ffcf3f}}
 #ttsa{border-color:#178a55}#ttsb{border-color:#b85c0a}
 .ttp.me{background:#fff;box-shadow:0 0 0 3px #ffcf3f}
 #ttq{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(8px + env(safe-area-inset-bottom,0px));width:min(96vw,720px);max-height:56vh;overflow:auto;z-index:6;background:#fffaf0;color:#1d2b53;border:4px solid #1d2b53;border-radius:18px;padding:10px 12px;font-family:"Baloo 2",system-ui,sans-serif;box-shadow:0 6px 0 rgba(29,43,83,.35)}
 #ttq.on{display:block}
+.ttqt{height:8px;border:2px solid #1d2b53;border-radius:6px;background:#fff;overflow:hidden;margin-bottom:6px}
+.ttqt i{display:block;height:100%;background:#2fa56b;transform-origin:left center;transform:scaleX(1)}
+.ttqt.lo i{background:#c62f26}
 .ttq1{font-size:clamp(16px,3.4vw,22px);font-weight:700;margin-bottom:8px;line-height:1.3}
 .tsp{float:right;min-width:44px;min-height:44px;border:3px solid #1d2b53;border-radius:12px;background:#fff;font-size:18px;cursor:pointer;margin-left:8px}
 .tto{display:grid;grid-template-columns:1fr 1fr;gap:8px;clear:both}
@@ -87,24 +99,29 @@ button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .tto button.ar{font-family:Amiri,"Noto Naskh Arabic",serif;font-size:clamp(20px,4vw,26px);direction:rtl;text-align:right}
 .tto button.ok{background:#178a55;color:#fff;box-shadow:0 3px 0 #0e5c38}.tto button.no{background:#c62f26;color:#fff;box-shadow:0 3px 0 #86201a}
 .tto button:disabled{cursor:default}
-.tto button:focus-visible,.tsp:focus-visible,.ttp:focus-visible{outline:4px solid #1d2b53;outline-offset:2px}
+.tto button:focus-visible,.tsp:focus-visible,.ttp:focus-visible,.ttlv button:focus-visible{outline:4px solid #1d2b53;outline-offset:2px}
 .tto i{font-style:normal;background:#1d2b53;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-grid;place-items:center;font-size:13px;flex:none}
 .ttf{min-height:20px;margin-top:6px;font-size:14px}
 #ttc{position:fixed;inset:0;z-index:7;align-items:center;justify-content:center;pointer-events:none;text-align:center;font:800 min(22vw,150px)/1.05 "Baloo 2",system-ui,sans-serif;color:#fff;-webkit-text-stroke:6px #1d2b53;paint-order:stroke fill}
 #ttc.on{display:flex;flex-direction:column;animation:ttpop .45s ease-out}
+#ttc.sm{font-size:min(9vw,56px);-webkit-text-stroke:4px #1d2b53;justify-content:flex-start;padding-top:22vh}
 #ttc small{font-size:.26em;-webkit-text-stroke:3px #1d2b53;margin-top:.3em}
 @keyframes ttpop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
 .ttg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 .ttcol{border:3px solid;border-radius:14px;padding:6px 10px;display:flex;flex-direction:column;gap:2px;font-size:15px;background:#fffaf0}
 .ttm{opacity:.7;font-size:13px}
-@media (max-height:420px){#ttq{max-height:60vh;padding:6px 10px}.ttq1{font-size:15px;margin-bottom:4px}.tto button{min-height:40px}#tth{gap:6px}.ttp{padding:5px 9px;font-size:14px}}
-@media (prefers-reduced-motion:reduce){#ttc.on{animation:none}.ttbar i{transition:none}}`;
+.ttlv{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0;font-weight:700;color:#1d2b53}
+.ttlv button{min-height:40px;border:3px solid #1d2b53;border-radius:999px;background:#fff;color:#1d2b53;padding:2px 12px;font:700 14px "Baloo 2",system-ui,sans-serif;cursor:pointer}
+.ttlv button.on{background:#ffcf3f}
+.ttcn{margin:8px 0}
+@media (max-height:420px){#ttq{max-height:60vh;padding:6px 10px}.ttq1{font-size:15px;margin-bottom:4px}.tto button{min-height:40px}#tth{gap:6px}.ttp{padding:5px 9px;font-size:14px}#ttc.sm{padding-top:14vh}}
+@media (prefers-reduced-motion:reduce){#ttc.on{animation:none}.ttbar i{transition:none}#tth.near .ttbar{animation:none}}`;
   document.head.appendChild(css);
   const w=document.createElement('div');
   w.innerHTML='<div id="tth"><div class="ttp" id="ttt">⏱ 2:00</div><div class="ttp" id="ttsa"></div><div class="ttbar" aria-hidden="true"><i id="ttm"></i></div><div class="ttp" id="ttsb"></div><button class="ttp" id="ttx" type="button" aria-label="Keluar dari Tarik Tali">✖</button></div>'
    +'<div id="ttq" role="group" aria-label="Soal"></div><div id="ttc" role="status" aria-live="polite"></div>';
   while(w.firstChild)document.body.appendChild(w.firstChild);
-  E.t=$('#ttt');E.m=$('#ttm');E.x=$('#ttx');E.a=$('#ttsa');E.b=$('#ttsb');E.q=$('#ttq');E.c=$('#ttc')})();
+  E.h=$('#tth');E.t=$('#ttt');E.m=$('#ttm');E.x=$('#ttx');E.a=$('#ttsa');E.b=$('#ttsb');E.q=$('#ttq');E.c=$('#ttc')})();
 const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};let qT=0;
 
 /* ---------- Gambar kanvas (label, papan, bendera) ---------- */
@@ -135,13 +152,16 @@ function mk(){
     bx(G0,.5,.5,18.8,c,s*RX,9,TZ);
     const bn=mkSign(7,2.4,384,128,dTeam(t));bn.position.set(s*RX,11.3,TZ);bn.rotation.y=Math.PI/2*0;G0.add(bn);
     for(let k=0;k<9;k++){const f=bx(G0,.15,.9,.9,k%2?c:0xffffff,s*RX,8.2-Math.abs(k-4)*.12,TZ-8.4+k*2.1);f.rotation.x=.2}});
-  /* tali berpilin */
-  const rp=new THREE.Group();rp.position.set(0,3.4,TZ);G0.add(rp);
+  /* tali berpilin (ikut bergeser bersama pelari) */
+  const rp=T.rope=new THREE.Group();rp.position.set(0,3.4,TZ);G0.add(rp);
   for(let k=0;k<50;k++){const sg=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,2.05,8),L(k%2?0xc89b5a:0xa87b3a));sg.rotation.z=Math.PI/2;sg.position.x=-49+k*2+1;rp.add(sg)}
   /* bendera tengah + pita */
   const fl=T.flag=new THREE.Group();fl.position.set(0,3.4,TZ);G0.add(fl);
   bx(fl,1,1.1,1.1,0xffcf3f,0,0,0);bx(fl,.3,6,.3,0x5a3a1c,0,3,0);
   T.ban=bx(fl,2.6,1.5,.15,0xe0524a,1.4,5.4,0);bx(fl,.9,.9,.9,0xffcf3f,0,6.1,0);
+  /* debu kaki (kumpulan partikel yang dipakai ulang) */
+  {const dg=new THREE.BoxGeometry(.5,.5,.5),dm=new THREE.MeshLambertMaterial({color:0xe9d9a6});
+   for(let k=0;k<32;k++){const m=new THREE.Mesh(dg,dm);m.visible=false;G0.add(m);T.dust.push({m,vx:0,vy:0,vz:0,l:0})}}
   /* penonton: tribun + sorak mendukung tim (kiri hijau, kanan jingga) */
   const gz=TZ-16;[0xd9594c,0x3d82e0,0xe0a43a].forEach((c,r)=>bx(G0,150,1.2+r*1.2,5,c,0,(1.2+r*1.2)/2,gz-r*5));
   const gc=[0x2fa56b,0x3fc07e,0x178a55,0xffffff],oc=[0xf08a24,0xffb347,0xd9701a,0xffffff],hg=new THREE.SphereGeometry(.5,8,6);
@@ -212,13 +232,15 @@ function connect(){
 /* ---------- Alur permainan ---------- */
 function modal(on){$('#modal').style.display=on?'flex':'none'}
 function flash(h,sm){E.c.className='';E.c.innerHTML=h;void E.c.offsetWidth;E.c.className=sm?'on sm':'on'}
+function toast(h){flash(h,1);clearTimeout(T.tt);T.tt=setTimeout(()=>{if(!T.cdn)E.c.className=''},1000)}
 function intro(){
   if(open||!ready||T.on)return;
   open=true;mode='tali';const c=$('#card'),s=T.sv;modal(true);c.scrollTop=0;
   c.innerHTML='<h2>🪢 Tarik Tali Ilmu</h2><div class="fc">Tim Hijau lawan Tim Jingga. Setiap jawaban <b>benar</b> menarik tali ke timmu. Jawab lebih banyak dari lawan, lalu tarik bendera melewati garis timmu!</div>'
    +`<div class="exst"><div><b>${s.win||0}</b><small>kali menang</small></div><div><b>${s.best||0}</b><small>tarikan terbanyak</small></div><div><b>${s.try||0}</b><small>kali main</small></div></div>`
    +'<div class="exrw"><b>👫</b><span><b>Bareng teman sekelas</b>: ruang dibuat dari kelas di akhir namamu (misalnya “Ahmad 4A”). Tim dibagi otomatis.</span></div>'
-   +'<div class="exrw"><b>🦉</b><span><b>Sendirian?</b> Lawanmu Kak Hud-hud. Salah tidak mengurangi tarikan, tapi kamu menunggu sebentar.</span></div>'
+   +'<div class="exrw"><b>🦉</b><span><b>Sendirian?</b> Lawanmu Kak Hud-hud, tingkatnya bisa dipilih di lobi. Salah tidak mengurangi tarikan, tapi kamu menunggu sebentar.</span></div>'
+   +`<div class="exrw"><b>🔥</b><span><b>Cepat dan beruntun!</b> Tiap soal ada waktu ${QT} detik. Jawab benar 3 kali berturut-turut, dapat tarikan bonus.</span></div>`
    +'<div class="exbt"><button class="opt go" id="ttgo0" type="button">▶ Masuk lobi</button><button class="opt" id="ttno0" type="button">✖ Nanti saja</button></div>';
   $('#ttgo0').onclick=begin;$('#ttno0').onclick=()=>{modal(false);open=false;mode=null}}
 function begin(){
@@ -228,11 +250,11 @@ function begin(){
   T.G.visible=true;T.on=true;open=true;mode='tali';document.body.classList.add('tli');P.visible=false;
   S.background=new THREE.Color(0xa8dcff);S.fog.color.setHex(0xa8dcff);S.fog.near=140;S.fog.far=560;cam.fov=55;cam.updateProjectionMatrix();
   pl.x=0;pl.y=0;pl.z=TZ;pl.yaw=0;pl.vy=0;
-  T.sv.try=(T.sv.try||0)+1;persist();T.tp=performance.now();T.fx=0;T.mid='';T.my=0;T.fin=null;T.q=null;T.played=false;T.hk='';T.cdn='';
+  T.sv.try=(T.sv.try||0)+1;persist();T.tp=performance.now();T.fx=0;T.mid='';T.my=0;T.fin=null;T.q=null;T.played=false;T.hk='';T.cdn='';rstat();
   connect()}
 function leave(){
-  const was=T.on;qreset();bye();T.on=false;T.ph='idle';clearTimeout(T.ct);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
-  E.c.className='';E.q.className='';E.q.innerHTML='';
+  const was=T.on;qreset();bye();T.on=false;T.ph='idle';clearTimeout(T.ct);clearTimeout(T.tt);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
+  E.c.className='';E.q.className='';E.q.innerHTML='';T.qb=null;E.h.classList.remove('near');
   if(was){
     const o=T.org;if(o){S.background=o.bg;S.fog.color.setHex(o.fc);S.fog.near=o.fn;S.fog.far=o.ff;cam.fov=o.fov;cam.updateProjectionMatrix()}
     if(T.G)T.G.visible=false;P.visible=true;
@@ -245,45 +267,59 @@ function quit(){if(!T.on)return;
   qT=setTimeout(qreset,3200)}
 function conn(){const c=$('#card');modal(true);c.scrollTop=0;c.innerHTML='<h2>🪢 Menyambung…</h2><div class="fc">Mencari teman sekelas. Kalau tidak ada internet, kamu main melawan Kak Hud-hud.</div><div class="exbt"><button class="opt" id="ttq0" type="button">✖ Batal</button></div>';$('#ttq0').onclick=leave}
 function lobby(c){
-  const sg=JSON.stringify([c.L.a.map(x=>x.n),c.L.b.map(x=>x.n),T.net,c.m&&c.m.id,c.ended,T.tm]);if(sg===T.ck)return;T.ck=sg;
+  const sg=JSON.stringify([c.L.a.map(x=>x.n),c.L.b.map(x=>x.n),T.net,c.m&&c.m.id,c.ended,T.tm,T.lv]);if(sg===T.ck)return;T.ck=sg;
   const col=t=>`<div class="ttcol" style="border-color:${TC[t].h}"><b style="color:${TC[t].h}">${TC[t].e} ${TC[t].n} · ${c.L[t].length}</b>${c.L[t].map(x=>`<span>${esc(x.n)}${x.k===dev?' (kamu)':''}</span>`).join('')||'<span class="ttm">menunggu teman…</span>'}</div>`;
   const solo=c.na===0||c.nb===0,card=$('#card');modal(true);
+  const lvH=solo?'<div class="ttlv" role="group" aria-label="Tingkat lawan"><span>🦉 Lawan:</span>'+LV.map((l,k)=>`<button type="button" data-lv="${k}" class="${k===T.lv?'on':''}" aria-pressed="${k===T.lv}">${l}</button>`).join('')+'</div>':'';
   card.innerHTML=`<h2>🪢 Lobi Tarik Tali</h2><div class="stp">${T.net?'☁️ Ruang '+esc(T.room.toUpperCase()):'📴 Main sendiri (tanpa internet)'}</div><div class="ttg">${col('a')}${col('b')}</div><div class="fc" style="text-align:center">Kamu di <b style="color:${TC[T.tm].h}">${TC[T.tm].e} ${TC[T.tm].n}</b></div>`
-   +`<div class="fc">${solo?'Belum ada lawan manusia: <b>Kak Hud-hud 🦉</b> akan jadi lawanmu.':'Siapa saja boleh menekan Mulai. Semua pemain langsung ikut.'}</div>`
+   +`<div class="fc">${solo?'Belum ada lawan manusia: <b>Kak Hud-hud 🦉</b> akan jadi lawanmu.':'Siapa saja boleh menekan Mulai. Semua pemain langsung ikut.'}</div>`+lvH
    +'<div class="exbt"><button class="opt go" id="ttgo" type="button">▶ Mulai pertandingan</button><button class="opt" id="ttno" type="button">✖ Keluar</button></div>';
+  card.querySelectorAll('[data-lv]').forEach(b=>{b.onclick=()=>{T.lv=num(b.dataset.lv,0,2,1);T.sv.lv=T.lv;persist();T.ck=''}});
   $('#ttgo').onclick=start;$('#ttno').onclick=leave;try{$('#ttgo').focus({preventScroll:true})}catch(e){}}
 function start(){
   const c=calc(T.tree,nowS());if(c.m&&!c.ended)return;
-  const id=Math.random().toString(36).slice(2,8),bot=(c.na===0||c.nb===0)?1:0;
-  T.mid=id;T.my=0;T.fin=null;T.played=true;put('m',t=>({id,t,b:bot,tg:TG,dur:DUR}));me()}
+  const id=Math.random().toString(36).slice(2,8),bot=(c.na===0||c.nb===0)?1:0,bm=BMS[T.lv]||BOTMS;
+  T.mid=id;T.my=0;T.fin=null;T.played=true;rstat();put('m',t=>({id,t,b:bot,tg:TG,dur:DUR,bm}));me()}
 function nextQ(){
   let i=T.pool.findIndex(x=>!x.u);
   if(i<0){T.pool=EXM.build().sort(()=>Math.random()-.5);i=T.pool.findIndex(x=>!x.u)}
   const q=T.pool[i<0?0:i];q.u=1;return q}
 function ask(){
-  const q=T.q=nextQ();E.q.className='on';
-  E.q.innerHTML=`<div class="ttq1">${q.sp?'<button class="tsp" type="button" aria-label="Dengarkan">🔊</button>':''}${q.q}</div><div class="tto">`
+  const q=T.q=nextQ();E.q.className='on';T.qs=performance.now();
+  E.q.innerHTML=`<div class="ttqt" aria-hidden="true"><i></i></div><div class="ttq1">${q.sp?'<button class="tsp" type="button" aria-label="Dengarkan">🔊</button>':''}${q.q}</div><div class="tto">`
    +q.o.map((x,k)=>`<button type="button" data-i="${k}" class="${ARX.test(x)?'ar':''}"><i aria-hidden="true">${k+1}</i><span>${x}</span></button>`).join('')+'</div><div class="ttf" role="status" aria-live="polite"></div>';
+  T.qb=E.q.querySelector('.ttqt i');
   if(q.q.indexOf('🎧')>=0&&q.sp)say(q.sp)}
 function pick(i){
-  const q=T.q;if(!q||q.done||T.ph!=='play'||!T.c||T.c.el<0)return;q.done=true;const ok=i===q.c;
+  const q=T.q;if(!q||q.done||T.ph!=='play'||!T.c||T.c.el<0)return;q.done=true;const ok=i===q.c;T.nall++;
   E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;const k=+b.dataset.i;if(k===q.c)b.classList.add('ok');else if(k===i)b.classList.add('no')});
   const f=E.q.querySelector('.ttf');
-  if(ok){T.my++;coins+=2;hud();me();snd(988,.12,'triangle');vib(20);T.pull=performance.now();
-    f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Tarik! +1 💪</b>';T.nxt=performance.now()+900}
-  else{snd(180,.25,'sawtooth');vib([60,40]);
+  if(ok){T.nok++;T.st++;const g=T.st%3===0?2:1;T.my+=g;coins+=2*g;hud();me();snd(988,.12,'triangle');vib(g>1?[20,30,40]:20);T.pull=performance.now();
+    if(g>1){snd(1319,.14,'triangle');toast('🔥 Beruntun x'+T.st+'!');f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Beruntun x'+T.st+'! Tarik +2 💪💪</b>'}
+    else f.innerHTML='<b style="color:#14744b">✔ <span class="ar" lang="ar">أَحْسَنْتَ</span> Tarik! +1 💪</b>';
+    T.nxt=performance.now()+900}
+  else{T.st=0;snd(180,.25,'sawtooth');vib([60,40]);
     f.innerHTML='<b style="color:#b8352b">🦉 Belum tepat.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';T.nxt=performance.now()+LOCKW+(q.ex?800:0)}}
+function tmo(){
+  const q=T.q;if(!q||q.done)return;q.done=true;T.st=0;T.nall++;
+  E.q.querySelectorAll('button[data-i]').forEach(b=>{b.disabled=true;if(+b.dataset.i===q.c)b.classList.add('ok')});
+  const f=E.q.querySelector('.ttf');if(f)f.innerHTML='<b style="color:#b8352b">⏰ Waktu habis.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';
+  snd(180,.25,'sawtooth');vib([60,40]);T.nxt=performance.now()+LOCKW+(q.ex?800:0)}
 function finish(c){
-  T.ph='end';T.fin=c;T.q=null;E.q.className='';E.q.innerHTML='';E.c.className='';
+  T.ph='end';T.fin=c;T.q=null;T.qb=null;E.q.className='';E.q.innerHTML='';E.c.className='';E.h.classList.remove('near');
   const won=c.win===T.tm,draw=c.win==='',s=T.sv,first=s.d!==dstr();let b=10;
   if(T.played){
     if(won){b=40;if(first){b+=60;s.d=dstr()}s.win=(s.win||0)+1}
     s.best=Math.max(s.best||0,T.my);persist();coins+=b;hud()}
   const card=$('#card');modal(true);card.scrollTop=0;
   const ttl=!T.played?'🪢 Pertandingan selesai':won?'🏆 Timmu menang!':draw?'🤝 Seri!':'🦉 Belum menang';
+  const mem=c.L[T.tm].slice().sort((x,y)=>y.c-x.c).slice(0,5),medal=['🥇','🥈','🥉'];
+  const ctb=T.played&&mem.length>1?`<div class="ttcol ttcn" style="border-color:${TC[T.tm].h}"><b style="color:${TC[T.tm].h}">Kontribusi ${TC[T.tm].n}</b>${mem.map((x,k)=>`<span>${medal[k]||'▫️'} ${esc(x.n)}${x.k===dev?' (kamu)':''}: ${x.c} tarikan</span>`).join('')}</div>`:'';
   card.innerHTML=`<h2>${ttl}</h2>`+(won?'<div class="ar center" lang="ar" style="font-size:34px;line-height:1.5">أَحْسَنْتَ! مَبْرُوكٌ</div>':'')
    +`<div class="exst"><div><b style="color:${TC.a.h}">${c.a}</b><small>${TC.a.e} ${TC.a.n}</small></div><div><b style="color:${TC.b.h}">${c.b}</b><small>${TC.b.e} ${TC.b.n}</small></div><div><b>${T.my}</b><small>tarikanmu</small></div></div>`
    +(T.played?`<div class="ex">🪙 +${b+T.my*2} koin (${T.my*2} dari jawaban benar${won&&first?', termasuk bonus menang pertama hari ini':''})</div>`:'')
+   +(T.played&&T.nall?`<div class="ex">🎯 Ketepatan: ${T.nok} dari ${T.nall} soal (${Math.round(T.nok*100/T.nall)}%)</div>`:'')
+   +ctb
    +(won?'':'<div class="fc">Tidak apa-apa! Perhatikan pembahasan setiap soal, lalu coba lagi bersama timmu.</div>')
    +'<div class="exbt"><button class="opt go" id="ttag" type="button">🔁 Main lagi</button><button class="opt" id="ttcl" type="button">✖ Tutup</button></div>';
   $('#ttag').onclick=()=>{modal(false);T.ph='lobby';T.ck='';T.cdn='';T.fin=null;const n=calc(T.tree,nowS());if(!n.m||n.ended)start()};
@@ -294,13 +330,15 @@ function finish(c){
 function hudUpd(c){
   const left=c.el<0?c.dur:Math.max(0,Math.ceil(c.dur-c.el));
   const la=TC.a.e+' '+c.a,lb=c.b+' '+TC.b.e+(c.bot?' 🦉':''),sg=left+'|'+la+'|'+lb+'|'+c.pos+'|'+T.tm;if(sg===T.hk)return;T.hk=sg;
+  if(T.ph==='play'&&c.el>=0&&left>0&&left<=10&&left!==T.lt){T.lt=left;snd(left<=3?880:660,.06,'square')}
   E.t.textContent='⏱ '+fmt(left);E.m.style.left=(50-c.pos*50)+'%';E.a.textContent=la;E.b.textContent=lb;
+  E.h.classList.toggle('near',Math.abs(c.pos)>=.7);
   E.a.classList.toggle('me',T.tm==='a');E.b.classList.toggle('me',T.tm==='b');
   E.a.setAttribute('aria-label',TC.a.n+' '+c.a+' tarikan'+(T.tm==='a'?', timmu':''));E.b.setAttribute('aria-label',TC.b.n+' '+c.b+' tarikan'+(T.tm==='b'?', timmu':''))}
 function tick(now){
   const c=T.c=calc(T.tree,nowS());
   if(T.joined&&now-T.hb>BEAT){T.hb=now;me()}
-  if(c.m&&c.m.id!==T.mid){T.mid=c.m.id;T.my=0;T.fin=null;if(T.joined)me()}
+  if(c.m&&c.m.id!==T.mid){T.mid=c.m.id;T.my=0;T.fin=null;rstat();if(T.joined)me()}
   if(T.ph==='lobby'){
     if(c.m&&!c.ended){T.ph='play';T.played=true;T.q=null;modal(false)}
     else lobby(c)}
@@ -310,20 +348,34 @@ function tick(now){
     if(s!==T.cdn){T.cdn=s;if(s){flash(s+(c.el<0?'<small>Kamu di '+TC[T.tm].e+' '+TC[T.tm].n+'</small>':''),0);snd(c.el<0?440:880,.12,'triangle')}else E.c.className=''}
     if(c.el>=0){
       if(T.q&&T.q.done&&now>=T.nxt)T.q=null;
-      if(!T.q&&now>=T.nxt)ask()}
-    else if(E.q.className){E.q.className='';E.q.innerHTML='';T.q=null}}
+      if(!T.q&&now>=T.nxt)ask();
+      if(T.q&&!T.q.done){const r=1-(now-T.qs)/(QT*1000);
+        if(T.qb){T.qb.style.transform='scaleX('+Math.max(0,r).toFixed(3)+')';T.qb.parentNode.classList.toggle('lo',r<.3)}
+        if(r<=0)tmo()}
+      const mp=c.pos*(T.tm==='a'?1:-1);
+      if(mp<=-.7){if(!T.wn){T.wn=1;toast('💪 Ayo tarik!')}}else if(mp>-.4)T.wn=0;
+      if(mp>=.7){if(!T.wm){T.wm=1;toast('🔥 Hampir menang!')}}else if(mp<.4)T.wm=0}
+    else if(E.q.className){E.q.className='';E.q.innerHTML='';T.q=null;T.qb=null}}
   hudUpd(c)}
+function puff(t){
+  if(RM)return;const dir=t==='a'?-1:1;let n=0;
+  for(const d of T.dust){if(n>=4)break;if(d.l>0)continue;n++;d.l=.6;d.m.visible=true;
+    d.m.position.set(dir*(8+Math.random()*10)+T.fx*.55,.4,TZ+1.2+(Math.random()-.5)*2.4);
+    d.vx=dir*(1+Math.random()*3);d.vy=2+Math.random()*3;d.vz=(Math.random()-.5)*3}}
 function frame(){
   const now=performance.now(),dt=Math.min(.05,Math.max(0,(now-T.tp)/1000)),t=now/1000;T.tp=now;
   tick(now);const c=T.c;
+  /* deteksi tarikan baru (dari tim mana pun, termasuk bot) -> tersentak + debu */
+  if(c.a>T.la){T.jk.a=now;puff('a')}if(c.b>T.lb){T.jk.b=now;puff('b')}T.la=c.a;T.lb=c.b;
   T.fx+=(-c.pos*RX-T.fx)*Math.min(1,dt*(RM?30:5));
   T.flag.position.x=T.fx;
+  const sh=T.fx*.55;T.rope.position.x=sh;
   if(T.ban&&!RM){T.ban.rotation.y=Math.sin(t*4)*.18;T.ban.position.x=1.4+Math.sin(t*3)*.12}
-  const jerk=RM?0:Math.max(0,1-(now-T.pull)/260),sh=T.fx*.55,mine=T.tm==='a'?-1:1;
+  const jf=k=>RM?0:Math.max(0,1-(now-T.jk[k])/260),jA=jf('a'),jB=jf('b');
   /* satu pelari: berdiri menghadap tali, miring ke belakang, kaki melangkah, label nama */
   const place=(g,i,dir,lean,on,nm,col)=>{g.visible=!!on;if(!on)return;const u=g.userData;
     g.position.x=dir*(9+i*3.3)+sh;g.rotation.y=dir<0?Math.PI/2:-Math.PI/2;
-    const ph=t*6+i*1.3,j=dir===mine?jerk:0;
+    const ph=t*6+i*1.3,j=dir<0?jA:jB;
     u.b.position.y=RM?0:Math.abs(Math.sin(ph))*.12;
     u.b.rotation.x=-(lean+(RM?0:.07*Math.sin(ph*1.2))+j*.18);
     const sw=RM?0:Math.sin(ph)*.3;u.lL.rotation.x=sw;u.lR.rotation.x=-sw;
@@ -333,11 +385,16 @@ function frame(){
   const bo=c.bot?1:0;
   place(T.ow,0,1,.5,!!bo,'Kak Hud-hud',TC.b.h);
   for(let i=0;i<MAXP;i++){const m=c.L.b[i];place(T.pb[i],i+bo,1,.5,i<c.nb&&i+bo<MAXP,m&&m.n,TC.b.h)}
+  /* debu kaki */
+  for(const d of T.dust){if(d.l<=0)continue;d.l-=dt;if(d.l<=0){d.m.visible=false;continue}
+    d.vy-=9*dt;d.m.position.x+=d.vx*dt;d.m.position.y=Math.max(.2,d.m.position.y+d.vy*dt);d.m.position.z+=d.vz*dt;d.m.scale.setScalar(Math.max(.05,d.l/.6))}
   /* penonton bersorak: tim yang unggul lebih heboh */
-  const cheer=now-T.pull<500;
+  const cheer=now-Math.max(T.jk.a,T.jk.b)<500;
   T.crowd.forEach(o=>{const lead=(o.s==='a'?c.pos:-c.pos)>0?.45:.15;o.g.position.y=o.y+(RM?0:Math.abs(Math.sin(t*4+o.k))*(cheer?.6:lead))});
   T.cl.forEach((g,i)=>{g.position.x+=Math.sin(t*.2+i)*.012});
-  cam.position.set(RM?0:Math.sin(t*.3)*1.5,8,TZ+30);cam.lookAt(0,-3.5,TZ);
+  /* kamera: di HP landscape (layar pendek) arena dinaikkan supaya tidak tertutup panel soal; sentakan kecil saat timmu menarik */
+  const jm=T.tm==='a'?jA:jB,ly=innerHeight<520?-8.5:-3.5;
+  cam.position.set(RM?0:Math.sin(t*.3)*1.5,8-jm*.35,TZ+30-jm*.9);cam.lookAt(0,ly,TZ);
   P.position.set(pl.x,pl.y,pl.z)}
 const R0=R.render;
 R.render=function(s,c){
