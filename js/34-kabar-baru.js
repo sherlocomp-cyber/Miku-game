@@ -8,6 +8,13 @@
 (function(){
 'use strict';
 const KB=[
+  {id:'2026-11-12b',tgl:'12 November 2026',judul:'Jembatan Kaca jadi lebih panjang 🌉',butir:[
+    '📏 Jembatan Kaca sekarang <b>minimal 20 soal acak</b>. Kamu juga bisa memilih 30, 40, 50, atau mengetik jumlah soal sendiri (20 sampai 60).',
+    '🎲 Soal diacak baru setiap kali main, jadi tidak selalu sama.',
+    '🏅 Rekor tercepat dihitung terpisah untuk tiap jumlah soal.',
+    '👁 Jembatan panjang dapat lebih banyak <b>Intip</b>: 1 kali tiap 10 soal.',
+    '⏱ Batas waktu ikut menyesuaikan panjang jembatan, dan tampil di layar awal.'
+  ]},
   {id:'2026-11-12a',tgl:'12 November 2026',judul:'Jembatan Kaca Ilmu makin seru 🌉',butir:[
     '🌉 Arena baru <b>Jembatan Kaca</b> (tombol 🌉 Kaca): pilih kaca yang berisi jawaban benar, sampai seberang lebih dulu dari Kak Hud-hud.',
     '🔁 Soal yang kamu salah akan <b>muncul lagi</b> beberapa soal kemudian, jadi bisa langsung dilatih.',
