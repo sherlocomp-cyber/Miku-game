@@ -1,14 +1,15 @@
-/* === BAGIAN 32 (v4, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
+/* === BAGIAN 32 (v4.1, improve): Tarik Tali Ilmu (Tahap 2 dari rencana Arena Belajar) ===
    Modul mandiri, tidak mengubah file 01-31 (hanya memakai global-nya). Dimuat setelah js/31. Tanpa SDK: REST + EventSource Firebase (sama seperti js/28).
    Permainan: Tim Hijau vs Tim Jingga. Setiap jawaban BENAR = 1 tarikan untuk tim. Selisih tarikan >= 8 = menang; waktu habis (2 menit) = tim terbanyak menang.
+   Seri saat waktu habis = TARIK EMAS (tambahan 20 dtk, tarikan pertama yang membuat unggul langsung menang; masih seri sesudahnya = seri). Dihitung di calc() dari data yang sama.
    Bareng-bareng: ruang = kelas dari akhir nama murid ("Ahmad 4A" -> "4a"), sama seperti Teman Online. Tim dibagi seimbang otomatis.
    Sendirian (atau 1 tim kosong): lawannya Kak Hud-hud (bot). Kecepatan bot dipilih di lobi (Santai 7,5 dtk / Normal 5,5 dtk / Sulit 4 dtk per tarikan),
    disimpan di /tali/<ruang>/m.bm dan dihitung dari jam server sehingga semua perangkat sama. Tanpa internet: otomatis main sendiri melawan Kak Hud-hud.
    Data: /tali/<ruang>/m = {id,t,b,tg,dur,bm} dan /tali/<ruang>/p/<id-perangkat> = {n,tm,c,mid,t,off}. Posisi tali = (tarikan A - tarikan B) / 8, dihitung lokal dari data yang sama (tanpa "host").
    Salah / waktu habis = tidak menarik, jeda 2,2 dtk + pembahasan (tidak ada pengurangan). Koin: +2 per tarikan, +40 menang (+60 menang pertama hari ini), +10 ikut. Tidak memanggil rec().
-   Baru di v4: (1) batas waktu 15 dtk per soal (bar waktu), (2) combo: 3 jawaban benar beruntun = tarikan bonus +1, (3) pilihan tingkat lawan di lobi,
-   (4) tali ikut bergeser bersama pelari, debu kaki, getar kamera, pelari lawan/bot ikut tersentak saat menarik, (5) peringatan "Ayo tarik!" / "Hampir menang!" + bar berdenyut,
-   (6) bunyi tik 10 detik terakhir, (7) hasil: ketepatan jawaban + kontribusi tiap anggota tim, (8) kamera naik di HP landscape agar arena tidak tertutup panel soal.
+   v4: batas waktu 15 dtk per soal, combo 3 benar beruntun = tarikan bonus +1, pilihan tingkat lawan, tali ikut bergeser, debu kaki, getar kamera,
+   peringatan "Ayo tarik!"/"Hampir menang!", bunyi tik 10 dtk terakhir, hasil: ketepatan + kontribusi tim, kamera naik di HP landscape.
+   v4.1: Tarik Emas (perpanjangan saat seri), hitungan combo tampil di pil waktu, penanda "Rekor baru!" di layar hasil.
    UX (v2): skor tim di sisi bar atas, timmu bertanda kuning, hitung mundur menyebut timmu, keluar dengan 2x ketuk (tanpa confirm()), getar di HP.
    Tampilan (v3): pelari berkarakter, tali berpilin, arena pasir bergaris, gawang bendera tim, panggung penonton, pohon, bukit, awan, papan judul.
    Cara balik ke tampilan lama: kembalikan berkas ini dari riwayat git, atau hapus baris <script> js/32 di index.html. */
@@ -18,7 +19,7 @@ if(window.TTI)return;
 if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||typeof P==='undefined'||typeof pl==='undefined'||typeof cam==='undefined'||typeof EXM==='undefined'||typeof EXM.build!=='function'){console.warn('Tali: modul pendukung belum siap');return}
 
 const DB='https://miku-profesi-default-rtdb.asia-southeast1.firebasedatabase.app';
-const TZ=-3600,RX=22,TG=8,DUR=120,CD=4,BOTMS=5500,STALE=20000,BEAT=5000,LOCKW=2200,MAXP=8,QT=15;
+const TZ=-3600,RX=22,TG=8,DUR=120,OT=20,CD=4,BOTMS=5500,STALE=20000,BEAT=5000,LOCKW=2200,MAXP=8,QT=15;
 const LV=['Santai','Normal','Sulit'],BMS=[7500,5500,4000];
 const TC={a:{c:0x2fa56b,h:'#178a55',n:'Tim Hijau',e:'🟢'},b:{c:0xf08a24,h:'#b85c0a',n:'Tim Jingga',e:'🟠'}};
 const ARX=/[\u0600-\u06FF]/,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -46,29 +47,32 @@ const safe=n=>{n=String(n==null?'':n).replace(/[\u0000-\u001f\u007f<>]/g,' ').re
 
 /* ---------- Status ---------- */
 const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,tm:'a',mid:'',my:0,q:null,pool:[],nxt:0,fin:null,played:false,hb:0,tp:0,fx:0,c:null,cdn:'',ck:'',hk:'',pull:0,qc:0,G:null,flag:null,ban:null,pa:[],pb:[],ow:null,crowd:[],cl:[],org:null,o:null,sv:{try:0,win:0,best:0,d:'',lv:1},
-  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,lt:99,wn:0,wm:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null};
+  lv:1,qs:0,qb:null,st:0,nok:0,nall:0,lt:99,wn:0,wm:0,otn:0,tt:0,jk:{a:-9e9,b:-9e9},la:0,lb:0,dust:[],rope:null};
 const lsRead=()=>{try{return typeof lsg==='function'?lsg(SKT):localStorage.getItem(SKT)}catch(e){return null}};
 try{Object.assign(T.sv,jp(lsRead()||'{}')||{})}catch(e){}
 T.lv=num(T.sv.lv,0,2,1);
 const persist=()=>{try{typeof lss==='function'?lss(SKT,JSON.stringify(T.sv)):localStorage.setItem(SKT,JSON.stringify(T.sv))}catch(e){}};
 const nowS=()=>Date.now()-(T.off||0);
 const E={};
-const rstat=()=>{T.st=0;T.nok=0;T.nall=0;T.lt=99;T.wn=0;T.wm=0;T.la=0;T.lb=0};
+const rstat=()=>{T.st=0;T.nok=0;T.nall=0;T.lt=99;T.wn=0;T.wm=0;T.otn=0;T.la=0;T.lb=0};
 
 /* ---------- Logika murni: dari data ruang -> keadaan pertandingan ---------- */
 function calc(tr,now){
   const m=tr&&tr.m&&typeof tr.m==='object'?tr.m:null,pp=(tr&&tr.p&&typeof tr.p==='object')?tr.p:{};
-  const r={m,a:0,b:0,na:0,nb:0,L:{a:[],b:[]},bot:!!(m&&m.b),el:-1,ended:false,win:'',pos:0,tg:TG,dur:DUR};
+  const r={m,a:0,b:0,na:0,nb:0,L:{a:[],b:[]},bot:!!(m&&m.b),el:-1,ended:false,win:'',pos:0,tg:TG,dur:DUR,ot:false};
   Object.keys(pp).forEach(k=>{const d=pp[k];if(!d||typeof d!=='object')return;const t=d.tm==='b'?'b':'a',mine=!!(m&&d.mid===m.id);
     if(!d.off&&now-num(d.t,0,9e15,0)<=STALE){r['n'+t]++;r.L[t].push({k,n:safe(d.n),c:mine?num(d.c,0,999,0):0})}
     if(mine)r[t]+=num(d.c,0,999,0)});
   if(m){
     r.tg=num(m.tg,3,30,TG);r.dur=num(m.dur,20,600,DUR);r.el=(now-num(m.t,0,9e15,0))/1000-CD;
     const bm=num(m.bm,2500,12000,BOTMS);
-    if(r.bot&&r.el>0)r.b+=Math.floor(Math.min(r.el,r.dur)*1000/bm);
+    if(r.bot&&r.el>0)r.b+=Math.floor(Math.min(r.el,r.dur+OT)*1000/bm);
     const df=r.a-r.b;r.pos=Math.max(-1,Math.min(1,df/r.tg));
     if(Math.abs(df)>=r.tg){r.ended=true;r.win=df>0?'a':'b'}
-    else if(r.el>=r.dur){r.ended=true;r.win=df>0?'a':df<0?'b':''}}
+    else if(r.el>=r.dur){
+      if(df!==0){r.ended=true;r.win=df>0?'a':'b'}
+      else if(r.el>=r.dur+OT){r.ended=true;r.win=''}
+      else r.ot=true}}
   return r}
 
 /* ---------- Elemen layar ---------- */
@@ -85,6 +89,7 @@ button.ttp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 .ttbar i{position:absolute;top:-2px;bottom:-2px;left:50%;width:12px;margin-left:-6px;background:#fff;border:3px solid #1d2b53;border-radius:6px;transition:left .25s}
 #tth.near .ttbar{animation:ttnear .5s infinite alternate}
 @keyframes ttnear{to{box-shadow:0 0 0 4px #ffcf3f}}
+#ttt.ot{background:#ffcf3f}
 #ttsa{border-color:#178a55}#ttsb{border-color:#b85c0a}
 .ttp.me{background:#fff;box-shadow:0 0 0 3px #ffcf3f}
 #ttq{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(8px + env(safe-area-inset-bottom,0px));width:min(96vw,720px);max-height:56vh;overflow:auto;z-index:6;background:#fffaf0;color:#1d2b53;border:4px solid #1d2b53;border-radius:18px;padding:10px 12px;font-family:"Baloo 2",system-ui,sans-serif;box-shadow:0 6px 0 rgba(29,43,83,.35)}
@@ -236,7 +241,7 @@ function toast(h){flash(h,1);clearTimeout(T.tt);T.tt=setTimeout(()=>{if(!T.cdn)E
 function intro(){
   if(open||!ready||T.on)return;
   open=true;mode='tali';const c=$('#card'),s=T.sv;modal(true);c.scrollTop=0;
-  c.innerHTML='<h2>🪢 Tarik Tali Ilmu</h2><div class="fc">Tim Hijau lawan Tim Jingga. Setiap jawaban <b>benar</b> menarik tali ke timmu. Jawab lebih banyak dari lawan, lalu tarik bendera melewati garis timmu!</div>'
+  c.innerHTML='<h2>🪢 Tarik Tali Ilmu</h2><div class="fc">Tim Hijau lawan Tim Jingga. Setiap jawaban <b>benar</b> menarik tali ke timmu. Jawab lebih banyak dari lawan, lalu tarik bendera melewati garis timmu! Kalau waktu habis dan seri, ada <b>Tarik Emas</b>: tarikan berikutnya yang membuat unggul langsung menang.</div>'
    +`<div class="exst"><div><b>${s.win||0}</b><small>kali menang</small></div><div><b>${s.best||0}</b><small>tarikan terbanyak</small></div><div><b>${s.try||0}</b><small>kali main</small></div></div>`
    +'<div class="exrw"><b>👫</b><span><b>Bareng teman sekelas</b>: ruang dibuat dari kelas di akhir namamu (misalnya “Ahmad 4A”). Tim dibagi otomatis.</span></div>'
    +'<div class="exrw"><b>🦉</b><span><b>Sendirian?</b> Lawanmu Kak Hud-hud, tingkatnya bisa dipilih di lobi. Salah tidak mengurangi tarikan, tapi kamu menunggu sebentar.</span></div>'
@@ -254,7 +259,7 @@ function begin(){
   connect()}
 function leave(){
   const was=T.on;qreset();bye();T.on=false;T.ph='idle';clearTimeout(T.ct);clearTimeout(T.tt);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
-  E.c.className='';E.q.className='';E.q.innerHTML='';T.qb=null;E.h.classList.remove('near');
+  E.c.className='';E.q.className='';E.q.innerHTML='';T.qb=null;E.h.classList.remove('near');E.t.classList.remove('ot');
   if(was){
     const o=T.org;if(o){S.background=o.bg;S.fog.color.setHex(o.fc);S.fog.near=o.fn;S.fog.far=o.ff;cam.fov=o.fov;cam.updateProjectionMatrix()}
     if(T.G)T.G.visible=false;P.visible=true;
@@ -306,17 +311,19 @@ function tmo(){
   const f=E.q.querySelector('.ttf');if(f)f.innerHTML='<b style="color:#b8352b">⏰ Waktu habis.</b> <span class="ex">💡 '+(q.ex||'')+'</span>';
   snd(180,.25,'sawtooth');vib([60,40]);T.nxt=performance.now()+LOCKW+(q.ex?800:0)}
 function finish(c){
-  T.ph='end';T.fin=c;T.q=null;T.qb=null;E.q.className='';E.q.innerHTML='';E.c.className='';E.h.classList.remove('near');
+  T.ph='end';T.fin=c;T.q=null;T.qb=null;E.q.className='';E.q.innerHTML='';E.c.className='';E.h.classList.remove('near');E.t.classList.remove('ot');
   const won=c.win===T.tm,draw=c.win==='',s=T.sv,first=s.d!==dstr();let b=10;
+  const old=s.best||0,rec=T.played&&T.my>old&&T.my>0;
   if(T.played){
     if(won){b=40;if(first){b+=60;s.d=dstr()}s.win=(s.win||0)+1}
-    s.best=Math.max(s.best||0,T.my);persist();coins+=b;hud()}
+    s.best=Math.max(old,T.my);persist();coins+=b;hud()}
   const card=$('#card');modal(true);card.scrollTop=0;
   const ttl=!T.played?'🪢 Pertandingan selesai':won?'🏆 Timmu menang!':draw?'🤝 Seri!':'🦉 Belum menang';
   const mem=c.L[T.tm].slice().sort((x,y)=>y.c-x.c).slice(0,5),medal=['🥇','🥈','🥉'];
   const ctb=T.played&&mem.length>1?`<div class="ttcol ttcn" style="border-color:${TC[T.tm].h}"><b style="color:${TC[T.tm].h}">Kontribusi ${TC[T.tm].n}</b>${mem.map((x,k)=>`<span>${medal[k]||'▫️'} ${esc(x.n)}${x.k===dev?' (kamu)':''}: ${x.c} tarikan</span>`).join('')}</div>`:'';
   card.innerHTML=`<h2>${ttl}</h2>`+(won?'<div class="ar center" lang="ar" style="font-size:34px;line-height:1.5">أَحْسَنْتَ! مَبْرُوكٌ</div>':'')
    +`<div class="exst"><div><b style="color:${TC.a.h}">${c.a}</b><small>${TC.a.e} ${TC.a.n}</small></div><div><b style="color:${TC.b.h}">${c.b}</b><small>${TC.b.e} ${TC.b.n}</small></div><div><b>${T.my}</b><small>tarikanmu</small></div></div>`
+   +(rec?`<div class="ex">🎉 <b>Rekor baru!</b> ${T.my} tarikan (sebelumnya ${old}).</div>`:'')
    +(T.played?`<div class="ex">🪙 +${b+T.my*2} koin (${T.my*2} dari jawaban benar${won&&first?', termasuk bonus menang pertama hari ini':''})</div>`:'')
    +(T.played&&T.nall?`<div class="ex">🎯 Ketepatan: ${T.nok} dari ${T.nall} soal (${Math.round(T.nok*100/T.nall)}%)</div>`:'')
    +ctb
@@ -324,14 +331,15 @@ function finish(c){
    +'<div class="exbt"><button class="opt go" id="ttag" type="button">🔁 Main lagi</button><button class="opt" id="ttcl" type="button">✖ Tutup</button></div>';
   $('#ttag').onclick=()=>{modal(false);T.ph='lobby';T.ck='';T.cdn='';T.fin=null;const n=calc(T.tree,nowS());if(!n.m||n.ended)start()};
   $('#ttcl').onclick=leave;
-  if(won){vib([40,40,40,40,120]);confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
+  if(won||rec){vib([40,40,40,40,120]);confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
 
 /* ---------- Per-frame ---------- */
 function hudUpd(c){
   const left=c.el<0?c.dur:Math.max(0,Math.ceil(c.dur-c.el));
-  const la=TC.a.e+' '+c.a,lb=c.b+' '+TC.b.e+(c.bot?' 🦉':''),sg=left+'|'+la+'|'+lb+'|'+c.pos+'|'+T.tm;if(sg===T.hk)return;T.hk=sg;
+  const la=TC.a.e+' '+c.a,lb=c.b+' '+TC.b.e+(c.bot?' 🦉':''),sg=left+'|'+la+'|'+lb+'|'+c.pos+'|'+T.tm+'|'+c.ot+'|'+T.st;if(sg===T.hk)return;T.hk=sg;
   if(T.ph==='play'&&c.el>=0&&left>0&&left<=10&&left!==T.lt){T.lt=left;snd(left<=3?880:660,.06,'square')}
-  E.t.textContent='⏱ '+fmt(left);E.m.style.left=(50-c.pos*50)+'%';E.a.textContent=la;E.b.textContent=lb;
+  E.t.textContent=(c.ot?'⚡ Tarik Emas':'⏱ '+fmt(left))+(T.st>0&&T.ph==='play'?' 🔥'+T.st:'');E.t.classList.toggle('ot',!!c.ot);
+  E.m.style.left=(50-c.pos*50)+'%';E.a.textContent=la;E.b.textContent=lb;
   E.h.classList.toggle('near',Math.abs(c.pos)>=.7);
   E.a.classList.toggle('me',T.tm==='a');E.b.classList.toggle('me',T.tm==='b');
   E.a.setAttribute('aria-label',TC.a.n+' '+c.a+' tarikan'+(T.tm==='a'?', timmu':''));E.b.setAttribute('aria-label',TC.b.n+' '+c.b+' tarikan'+(T.tm==='b'?', timmu':''))}
@@ -352,6 +360,7 @@ function tick(now){
       if(T.q&&!T.q.done){const r=1-(now-T.qs)/(QT*1000);
         if(T.qb){T.qb.style.transform='scaleX('+Math.max(0,r).toFixed(3)+')';T.qb.parentNode.classList.toggle('lo',r<.3)}
         if(r<=0)tmo()}
+      if(c.ot&&!T.otn){T.otn=1;toast('⚡ Tarik Emas! Tarikan berikutnya menang');vib([60,40,60]);snd(1175,.18,'triangle')}
       const mp=c.pos*(T.tm==='a'?1:-1);
       if(mp<=-.7){if(!T.wn){T.wn=1;toast('💪 Ayo tarik!')}}else if(mp>-.4)T.wn=0;
       if(mp>=.7){if(!T.wm){T.wm=1;toast('🔥 Hampir menang!')}}else if(mp<.4)T.wm=0}
