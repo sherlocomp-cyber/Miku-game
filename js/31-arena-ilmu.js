@@ -1,4 +1,4 @@
-/* === BAGIAN 31 (v4): Arena Lampu Ilmu — Lomba Pasangan Kata, 2–8 pemain ===
+/* === BAGIAN 31 (v4.1): Arena Lampu Ilmu — Lomba Pasangan Kata, 2–8 pemain + mode Tim gantian ===
    Menggantikan v2 (lampu hijau/merah). Riwayat lama ada di git. Pasangan: css/arena.css (tidak dipakai lagi; CSS baru ada di dalam berkas ini).
    Aturan: tiap ronde (4,6 dtk) muncul pasangan Arab–Indonesia. Pasangan BENAR = boleh maju (tahan LARI). Pasangan SALAH = harus diam;
    kalau tetap bergerak setelah jeda 0,9 dtk -> terpeleset ke pos terakhir, -1 hati. Pasangan sama untuk semua pemain (dari seed + jam server).
@@ -8,6 +8,10 @@
    Bareng: ruang = kelas dari akhir nama + nomor Regu (1-6), Firebase REST + EventSource (seperti js/28 & js/32), maks 8 pemain per regu, min 2.
    Data: /lampu/<ruang>/m = {id,t,seed,pl:[id-perangkat],md:'solo'|'duo'} dan /lampu/<ruang>/p/<id-perangkat> = {n,z(dm),h,f(dtk*10),mid,t,off}.
    Tanpa internet / sendirian: tombol "Latihan sendiri". Aturan Firebase: lihat blok "lampu" (isi bebas seperti /tali).
+   v4.1 TIM GANTIAN (seperti Jembatan Kaca): satu layar, 2 tim (Hijau/Jingga) bergiliran tiap ronde; tim yang sedang giliran memutuskan tahan LARI
+   (pasangan benar) atau DIAM (pasangan salah), tim yang menunggu tidak bergerak. Tiap tim punya 3 hati sendiri; tim yang tersingkir dilewati.
+   Tim pertama sampai finis menang; waktu habis = yang lebih jauh menang, sama jauh = seri. Data lokal /lampu/gt (id pemain gt0/gt1), tanpa Firebase,
+   tanpa koin dan rekor. Memakai calc() yang sama. Dipilih dari kartu pembuka ("👥 Tim gantian").
    Kembali ke tampilan lama: kembalikan berkas ini dari riwayat git. */
 (function(){
 'use strict';
@@ -16,6 +20,7 @@ if(typeof THREE==='undefined'||typeof S==='undefined'||typeof R==='undefined'||t
 const DB='https://miku-profesi-default-rtdb.asia-southeast1.firebasedatabase.app';
 const AZ=-1800,LEN=260,LW=2.6,SP=6.2,CD=4,RD=4.6,SHOW=3.8,GR=.9,DUR=300,STALE=20000,BEAT=5000,MAXP=8,STUN=1.3;
 const LC=['#e0524a','#3d82e0','#2fa56b','#e0a43a','#9b6bd6','#2fb5b0','#e86ca0','#6b7a4a'],LH=[0xe0524a,0x3d82e0,0x2fa56b,0xe0a43a,0x9b6bd6,0x2fb5b0,0xe86ca0,0x6b7a4a];
+const GC=['#178a55','#b85c0a'],GH=[0x2fa56b,0xf08a24],GN=['Tim Hijau','Tim Jingga'],GE=['🟢','🟠'];
 const SVT={'.sv':'timestamp'},RM=matchMedia('(prefers-reduced-motion:reduce)').matches,ARX=/[\u0600-\u06FF]/;
 const SKA=SK+':arena';
 const jp=t=>{try{return JSON.parse(t)}catch(e){return null}};
@@ -39,12 +44,19 @@ function pairAt(seed,r){const g=rng(seed+'|'+r),n=VOC.length,i=(g()*n)|0,ok=g()<
  return{a:VOC[i][0],b:VOC[ok?i:j][1],ok,ta:VOC[i][1]}}
 
 /* ---------- Status ---------- */
-const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,mid:'',c:null,hb:0,zs:0,tp:0,rd:-9,pr:null,rv:0,lane:0,ck:'',qc:0,G:null,rn:[],crowd:[],cl:[],board:null,head:null,org:null,o:null,shake:0,regu:1,cheer:0,solo:false,md:'solo',sv:{try:0,win:0,best:0,bt:0,d:'',regu:1}};
+const T={on:false,built:false,ph:'idle',room:'',tree:{},off:0,offOk:false,net:false,es:null,ct:0,joined:false,mid:'',c:null,hb:0,zs:0,tp:0,rd:-9,pr:null,rv:0,lane:0,ck:'',qc:0,G:null,rn:[],crowd:[],cl:[],board:null,head:null,org:null,o:null,shake:0,regu:1,cheer:0,solo:false,md:'solo',sv:{try:0,win:0,best:0,bt:0,d:'',regu:1},
+  gt:0,cur:0,tms:[null,null],gfin:0};
 const L={z:0,v:0,h:3,cp:0,st:0,f:0,run:false,kd:false,miss:[]};
 try{Object.assign(T.sv,JSON.parse(lsg(SKA)||'{}'))}catch(e){}
 const persist=()=>{try{lss(SKA,JSON.stringify(T.sv))}catch(e){}};
 const nowS=()=>Date.now()-(T.off||0);
 const E={};let qT=0;
+/* mode Tim gantian: L = keadaan tim yang sedang giliran, tim satunya disimpan di T.tms */
+const tcol=i=>T.gt?GC[i]:LC[i],tch=i=>T.gt?GH[i]:LH[i];
+const LF=['z','v','h','cp','st','f','miss'];
+function swapT(){const o={};LF.forEach(k=>{o[k]=L[k]});T.tms[T.cur]=o;T.cur=1-T.cur;const n=T.tms[T.cur];LF.forEach(k=>{L[k]=n[k]});L.run=false}
+const gS=i=>i===T.cur?L:T.tms[i];
+function gtTurn(c){let b=c.rd<0?0:c.rd%2;if(gS(b).h<=0&&gS(1-b).h>0)b=1-b;return b}
 
 /* ---------- Logika murni: data ruang -> keadaan pertandingan ---------- */
 function calc(tr,now){
@@ -78,6 +90,7 @@ button.lpp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
 #lpb .c.a{font-family:Amiri,"Noto Naskh Arabic",serif;font-size:clamp(26px,6vw,40px);direction:rtl}
 #lpb .e{font-size:clamp(24px,5vw,34px);font-weight:800;color:#fff}
 #lpb .m{margin-top:6px;display:inline-block;background:#fffaf0;color:#1d2b53;border:3px solid #1d2b53;border-radius:999px;padding:4px 12px;font-weight:700;font-size:clamp(13px,2.8vw,16px)}
+#lpb .m.lptn0{background:#178a55;color:#fff;margin:0 0 6px}#lpb .m.lptn1{background:#b85c0a;color:#fff;margin:0 0 6px}
 #lpb .t{height:8px;margin:6px 14px 0;background:rgba(29,43,83,.35);border-radius:6px;overflow:hidden}#lpb .t i{display:block;height:100%;background:#ffcf3f;transform-origin:left;transform:scaleX(1)}
 #lprun{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:6;width:118px;height:118px;border-radius:50%;border:5px solid #1d2b53;background:#ffcf3f;color:#1d2b53;flex-direction:column;align-items:center;justify-content:center;font:800 20px/1 "Baloo 2",system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
 #lprun span{font-size:34px}#lprun small{font-size:11px;font-weight:600}#lprun.on{background:#2fa56b;color:#fff;transform:scale(.94)}
@@ -98,6 +111,8 @@ button.lpp{cursor:pointer;min-width:44px;min-height:44px;padding:4px 12px}
   E.he=$('#lphe');E.bar=$('#lpbar');E.t=$('#lpt');E.x=$('#lpx');E.b=$('#lpb');E.run=$('#lprun');E.c=$('#lpc');
   if(matchMedia('(pointer:coarse)').matches){const s=E.run.querySelector('small');if(s)s.textContent='tahan untuk lari'}})();
 const hearts=()=>'❤️'.repeat(Math.max(0,L.h))+'🖤'.repeat(Math.max(0,3-L.h));
+/* mode Tim gantian: hati kedua tim */
+const hh=()=>{if(!T.gt)return hearts();const h=i=>Math.max(0,gS(i).h);return GE[0]+'❤️'.repeat(h(0))+' '+GE[1]+'❤️'.repeat(h(1))};
 let fT=0;function flash(h,sm){clearTimeout(fT);E.c.className='';E.c.innerHTML=h;void E.c.offsetWidth;E.c.className=sm?'on sm':'on';if(sm)fT=setTimeout(()=>{E.c.className=''},1400)}
 
 /* ---------- Gambar papan (kanvas) ---------- */
@@ -184,7 +199,10 @@ function onPut(e){const m=jp(e.data);if(!m||typeof m.path!=='string')return;setP
 function onPatch(e){const m=jp(e.data);if(!m||typeof m.path!=='string'||!m.data)return;for(const k in m.data)setPath((m.path==='/'?'':m.path)+'/'+k,m.data[k]);after(false)}
 function put(path,mkv){setPath(path,mkv(nowS()));if(!T.net)return;
   fetch(DB+'/lampu/'+T.room+'/'+path+'.json',{method:'PUT',body:JSON.stringify(mkv(SVT)),headers:{'Content-Type':'application/json'}}).catch(()=>{})}
-function me(){put('p/'+dev,t=>({n:nm(),z:Math.round(L.z*10),h:L.h,f:L.f,mid:T.mid,t}))}
+/* mode Tim gantian: dua "pemain" gt0/gt1 mewakili dua tim, data hanya lokal */
+function me(){
+  if(T.gt){[0,1].forEach(i=>{const s=gS(i);if(!s)return;put('p/gt'+i,t=>({n:GN[i],z:Math.round(s.z*10),h:s.h,f:s.f,mid:T.mid,t}))});return}
+  put('p/'+dev,t=>({n:nm(),z:Math.round(L.z*10),h:L.h,f:L.f,mid:T.mid,t}))}
 function bye(){if(!T.net||!T.joined)return;try{fetch(DB+'/lampu/'+T.room+'/p/'+dev+'.json',{method:'PUT',body:JSON.stringify({n:nm(),z:Math.round(L.z*10),h:L.h,f:L.f,mid:T.mid,off:1,t:SVT}),headers:{'Content-Type':'application/json'},keepalive:true}).catch(()=>{})}catch(e){}}
 function joined(){if(T.joined)return;T.joined=true;clearTimeout(T.ct);me();T.ph='lobby';T.ck=''}
 function local(){clearTimeout(T.ct);try{T.es&&T.es.close()}catch(e){}T.es=null;T.net=false;T.off=0;T.tree={};if(!T.joined)joined()}
@@ -201,23 +219,36 @@ function intro(){
    +'<div class="exrw"><b>🟰</b><span><b>Cocok?</b> Contoh: <span class="ar" lang="ar">فَلَّاحٌ</span> = petani → benar, tahan tombol LARI.</span></div>'
    +'<div class="exrw"><b>≠</b><span><b>Tidak cocok?</b> Lepas tombol! Kalau masih bergerak, kamu terpeleset ke pos terakhir dan kehilangan ❤️.</span></div>'
    +'<div class="exrw"><b>👫</b><span><b>Dua mode</b> (dipilih di lobi): <b>Sendiri-sendiri</b> (2–8 orang, juara perorangan) atau <b>Berpasangan</b> (tim 2 orang, 4/6/8 pemain; tim menang kalau keduanya sampai finis lebih dulu).</span></div>'
+   +'<div class="exrw"><b>👥</b><span><b>Tim gantian</b>: dua tim bergiliran tiap ronde di satu layar (cocok diproyeksikan ke kelas). Tim yang giliran memutuskan LARI atau DIAM. Tanpa internet dan tanpa koin.</span></div>'
    +'<div class="exrw"><b>🚩</b><span><b>3 pos aman</b> di jalur. Hati habis = tersingkir.</span></div>'
    +'<div class="gt">Pilih Regu (sama dengan temanmu)</div><div class="lpk" id="lpk">'+[1,2,3,4,5,6].map(n=>`<button type="button" data-r="${n}" class="${n===T.regu?'on':''}">${n}</button>`).join('')+'</div>'
-   +'<div class="exbt"><button class="opt go" id="lpg1" type="button">▶ Masuk lobi</button><button class="opt" id="lpg0" type="button">✖ Nanti saja</button></div>';
+   +'<div class="exbt"><button class="opt go" id="lpg1" type="button">▶ Masuk lobi</button><button class="opt" id="lpgt" type="button">👥 Tim gantian (1 layar)</button><button class="opt" id="lpg0" type="button">✖ Nanti saja</button></div>';
   $('#lpk').onclick=e=>{const b=e.target.closest('button');if(!b)return;T.regu=+b.dataset.r;$('#lpk').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};
-  $('#lpg1').onclick=begin;$('#lpg0').onclick=leave}
-function begin(){
+  $('#lpg1').onclick=()=>begin(0);$('#lpgt').onclick=()=>begin(1);$('#lpg0').onclick=leave}
+function begin(gt){
   mk();T.org={bg:S.background,fc:S.fog.color.getHex(),fn:S.fog.near,ff:S.fog.far,fov:cam.fov,far:cam.far};T.o={x:pl.x,y:pl.y,z:pl.z,yaw:pl.yaw};
+  T.gt=gt?1:0;
   T.G.visible=true;T.on=true;open=true;mode='arena';document.body.classList.add('lpa');
   S.background=new THREE.Color(0xa8dcff);S.fog.color.setHex(0xa8dcff);S.fog.near=80;S.fog.far=480;cam.fov=62;cam.updateProjectionMatrix();
-  pl.x=0;pl.y=0;pl.z=AZ;pl.yaw=0;pl.vy=0;T.sv.try=(T.sv.try||0)+1;persist();T.tp=performance.now();T.mid='';T.rd=-9;T.pr=null;T.rv=0;resetL();connect()}
-function resetL(){L.z=0;L.v=0;L.h=3;L.cp=0;L.st=0;L.f=0;L.miss=[];L.run=false;L.kd=false;E.run.classList.remove('on')}
+  pl.x=0;pl.y=0;pl.z=AZ;pl.yaw=0;pl.vy=0;
+  if(!T.gt){T.sv.try=(T.sv.try||0)+1;persist()}
+  T.tp=performance.now();T.mid='';T.rd=-9;T.pr=null;T.rv=0;resetL();
+  if(T.gt){P.visible=false;T.net=false;T.joined=true;T.offOk=false;T.off=0;T.tree={};T.room='gt';T.md='solo';T.ph='lobby';startGt()}
+  else connect()}
+/* mode Tim gantian: pertandingan lokal 2 tim, tanpa Firebase */
+function startGt(){
+  const id=Math.random().toString(36).slice(2,8),seed=Math.random().toString(36).slice(2,8);
+  T.gt=1;T.solo=false;T.ph='lobby';T.ck='';
+  put('m',t=>({id,t,seed,pl:['gt0','gt1'],md:'solo'}))}
+function resetL(){L.z=0;L.v=0;L.h=3;L.cp=0;L.st=0;L.f=0;L.miss=[];L.run=false;L.kd=false;E.run.classList.remove('on');
+  T.cur=0;T.tms=[null,{z:0,v:0,h:3,cp:0,st:0,f:0,miss:[]}];T.gfin=0}
 function leave(){
   const was=T.on;qreset();bye();T.on=false;T.ph='idle';clearTimeout(T.ct);try{T.es&&T.es.close()}catch(e){}T.es=null;T.joined=false;
   document.body.classList.remove('lpa','lpr');E.c.className='';E.b.innerHTML='';
   if(was){const o=T.org;if(o){S.background=o.bg;S.fog.color.setHex(o.fc);S.fog.near=o.fn;S.fog.far=o.ff;cam.fov=o.fov;cam.far=o.far;cam.updateProjectionMatrix()}
-    if(T.G)T.G.visible=false;P.rotation.order='XYZ';P.rotation.set(0,0,0);P.scale.setScalar(1);P.armL.rotation.set(0,0,0);P.armR.rotation.set(0,0,0);P.legL.rotation.x=P.legR.rotation.x=0;
+    if(T.G)T.G.visible=false;P.visible=true;P.rotation.order='XYZ';P.rotation.set(0,0,0);P.scale.setScalar(1);P.armL.rotation.set(0,0,0);P.armR.rotation.set(0,0,0);P.legL.rotation.x=P.legR.rotation.x=0;
     if(T.o){pl.x=T.o.x;pl.y=0;pl.z=T.o.z;pl.yaw=T.o.yaw}pl.vy=0}
+  T.gt=0;T.cur=0;T.tms=[null,null];
   modal(false);open=false;mode=null}
 function qreset(){T.qc=0;clearTimeout(qT);E.x.textContent='✖'}
 function quit(){if(!T.on)return;if(T.ph!=='play'||T.qc){qreset();leave();return}T.qc=1;E.x.textContent='Keluar? Ketuk lagi';qT=setTimeout(qreset,3200)}
@@ -244,20 +275,34 @@ function start(kind){
   if(pr){T.net=false}}
 function enterPlay(c){
   T.mid=c.m.id;T.ph='play';T.rd=-9;T.pr=null;T.rv=0;T.lane=Math.max(0,c.ids.indexOf(dev));resetL();modal(false);document.body.classList.add('lpr');me();T.zs=0;
-  c.ids.forEach((k,i)=>{const r=T.rn[i];if(r){r.z=AZ;r.v=0;r.nm='';r.g.rotation.z=0;r.tc=LC[ci(c,i)];r.cm.forEach(m=>m.color.setHex(LH[ci(c,i)]))}});E.he.textContent=hearts();
-  E.bar.querySelectorAll('.d').forEach(d=>d.remove());c.ids.forEach((k,i)=>{const d=document.createElement('i');d.className='d'+(k===dev?' me':'');d.style.background=LC[ci(c,i)];d.style.left='0%';E.bar.appendChild(d)})}
+  c.ids.forEach((k,i)=>{const r=T.rn[i];if(r){r.z=AZ;r.v=0;r.nm='';r.g.rotation.z=0;r.tc=tcol(ci(c,i));r.cm.forEach(m=>m.color.setHex(tch(ci(c,i))))}});E.he.textContent=hh();
+  E.bar.querySelectorAll('.d').forEach(d=>d.remove());c.ids.forEach((k,i)=>{const d=document.createElement('i');d.className='d'+(k===dev?' me':'');d.style.background=tcol(ci(c,i));d.style.left='0%';E.bar.appendChild(d)})}
 function caught(pr){
-  L.h--;L.st=STUN;L.z=L.cp;L.v=0;T.shake=.5;snd(160,.35,'sawtooth',.08);vib([90,50,90]);E.he.textContent=hearts();
+  L.h--;L.st=STUN;L.z=L.cp;L.v=0;T.shake=.5;snd(160,.35,'sawtooth',.08);vib([90,50,90]);E.he.textContent=hh();
   if(!L.miss.some(m=>m.a===pr.a))L.miss.push(pr);me();
-  flash(L.h>0?'😵‍💫 Pasangan salah, tapi kamu bergerak!<br><small>Kembali ke pos terakhir</small>':'😵‍💫 Hatimu habis!',1)}
-function finishRun(c){L.f=Math.max(1,Math.round(c.el*10));L.v=0;T.cheer=performance.now();snd(988,.2,'triangle');vib([40,40,40,40,120]);confetti();me();flash('🏁 Kamu sampai garis finis!<br><small>'+(dm(c)?'Menunggu pasanganmu…':'Menunggu pemain lain…')+'</small>',1)}
+  flash(L.h>0?(T.gt?'😵‍💫 Pasangan salah, tapi timmu bergerak!':'😵‍💫 Pasangan salah, tapi kamu bergerak!')+'<br><small>Kembali ke pos terakhir</small>':(T.gt?'😵‍💫 Hati timmu habis!':'😵‍💫 Hatimu habis!'),1)}
+function finishRun(c){L.f=Math.max(1,Math.round(c.el*10));L.v=0;T.cheer=performance.now();T.gfin=performance.now();snd(988,.2,'triangle');vib([40,40,40,40,120]);confetti();me();
+  flash(T.gt?'🏁 '+GE[T.cur]+' '+GN[T.cur]+' sampai garis finis!':'🏁 Kamu sampai garis finis!<br><small>'+(dm(c)?'Menunggu pasanganmu…':'Menunggu pemain lain…')+'</small>',1)}
 function groups(c){
   const duo=dm(c),per=c.ids.map(k=>{const d=c.pp[k]||{},m=k===dev;return{k,n:m?nm():String(d.n||'Teman').slice(0,14),z:m?L.z:num(d.z,0,9999,0)/10,f:(m?L.f:num(d.f,0,99999,0))/10,h:m?L.h:num(d.h,0,3,0),mine:m}});
   const gs=[];per.forEach((x,i)=>{if(duo&&i%2&&gs.length)gs[gs.length-1].m.push(x);else gs.push({m:[x],ci:duo?i>>1:i})});
   gs.forEach(g=>{g.n=g.m.map(x=>x.n).join(' & ');g.z=g.m.reduce((s,x)=>s+x.z,0)/g.m.length;g.f=g.m.every(x=>x.f>0)?Math.max(...g.m.map(x=>x.f)):0;g.h=Math.max(...g.m.map(x=>x.h));g.mine=g.m.some(x=>x.mine)});
   return gs.sort((a,b)=>(b.f>0)-(a.f>0)||(a.f>0&&b.f>0?a.f-b.f:b.z-a.z))}
+/* layar hasil mode Tim gantian: tanpa koin dan tanpa rekor */
+function endGt(c){
+  const rk=groups(c),a=rk[0],b=rk[1],win=a&&(a.f>0||(b&&a.z>b.z+.05))?a:null,card=$('#card'),byc=rk.slice().sort((x,y)=>x.ci-y.ci);
+  const all=[];L.miss.concat((T.tms[1-T.cur]||{}).miss||[]).forEach(q=>{if(!all.some(m=>m.a===q.a))all.push(q)});
+  const rc=all.slice(0,5).map(q=>`<div class="ex">📖 <span class="ar" lang="ar">${esc(q.a)}</span> = <b>${esc(q.ta)}</b> (bukan “${esc(q.b)}”)</div>`).join('');
+  modal(true);card.scrollTop=0;
+  card.innerHTML=`<h2>${win?GE[win.ci]+' '+GN[win.ci]+' menang!':'🤝 Seri!'}</h2>`+(win?'<div class="ar center" lang="ar" style="font-size:34px;line-height:1.5">أَحْسَنْتُمْ! مَبْرُوكٌ</div>':'')
+   +'<div class="exst">'+byc.map(x=>`<div><b>${x.f>0?'🏁 '+fmt(x.f):x.h<=0?'😵':Math.round(x.z)+' m'}</b><small>${GE[x.ci]} ${GN[x.ci]}${x.f<=0&&x.h<=0?' (tersingkir)':''}</small></div>`).join('')+'</div>'
+   +(rc?'<div class="gt">Pasangan yang perlu dibahas bersama</div>'+rc:'')+'<div class="fc">Beri tepuk tangan untuk kedua tim!</div>'
+   +'<div class="exbt"><button class="opt go" id="lpag" type="button">🔁 Main lagi</button><button class="opt" id="lpcl" type="button">✖ Tutup</button></div>';
+  $('#lpag').onclick=()=>{resetL();startGt()};$('#lpcl').onclick=leave;
+  if(win){confetti();[523,659,784,1047].forEach((f,k)=>setTimeout(()=>snd(f,.2,'triangle'),k*120))}}
 function endCard(c){
   T.ph='end';document.body.classList.remove('lpr');E.c.className='';E.b.innerHTML='';
+  if(T.gt){endGt(c);return}
   const rk=groups(c),duo=dm(c),pos=Math.max(0,rk.findIndex(x=>x.mine)),g0=rk[pos]||{f:0},fin=g0.f>0,s=T.sv,first=s.d!==dstr(),n=rk.length;
   let b=10;if(fin){b+=50+([30,20,10][pos]||0);if(rk.every(x=>x.f>0)&&n>1)b+=20;if(!s.bt||g0.f<s.bt)s.bt=g0.f;if(pos===0&&n>1){s.win=(s.win||0)+1;if(first){b+=60;s.d=dstr()}}}
   persist();coins+=b;hud();
@@ -272,10 +317,10 @@ function endCard(c){
 
 /* ---------- Per-frame ---------- */
 function showPair(c){
-  const pr=T.pr;E.b.className=T.rv>0?'ok':T.rv<0?'no':'';
+  const pr=T.pr,tn=T.gt?`<div class="m lptn${T.cur}">${GE[T.cur]} Giliran ${GN[T.cur]}</div>`:'';E.b.className=T.rv>0?'ok':T.rv<0?'no':'';
   if(c.el<0){const ix=c.ids.indexOf(dev),pk=dm(c)?c.ids[ix^1]:null,pt=pk?`<div class="m">👫 Timmu: ${esc(String((c.pp[pk]||{}).n||'Teman').slice(0,14))} (Tim ${(ix>>1)+1})</div>`:'';
-    E.b.innerHTML='<div class="w"><div class="c">Bersiap…</div></div>'+pt;return}
-  E.b.innerHTML=`<div class="w"><div class="c a" lang="ar">${esc(pr.a)}</div><div class="e">${T.rv>0?'=':T.rv<0?'≠':'?'}</div><div class="c">${esc(pr.b)}</div></div>`
+    E.b.innerHTML=tn+'<div class="w"><div class="c">Bersiap…</div></div>'+pt;return}
+  E.b.innerHTML=tn+`<div class="w"><div class="c a" lang="ar">${esc(pr.a)}</div><div class="e">${T.rv>0?'=':T.rv<0?'≠':'?'}</div><div class="c">${esc(pr.b)}</div></div>`
    +`<div class="m">${T.rv>0?'✔ BENAR — boleh maju!':T.rv<0?'✖ SALAH — diam! Yang benar: '+esc(pr.ta):'Cocok → LARI · Tidak cocok → DIAM'}</div><div class="t"><i id="lpti"></i></div>`;
   E.ti=$('#lpti');if(T.board)T.board.f()}
 function sim(c,dt){
@@ -290,10 +335,13 @@ function sim(c,dt){
 function tick(now,dt){
   const c=T.c=calc(T.tree,nowS());
   if(T.joined&&now-T.hb>BEAT){T.hb=now;me()}
-  if((T.ph==='lobby'||T.ph==='end')&&c.m&&!c.ended&&c.ids.includes(dev)&&c.m.id!==T.mid)enterPlay(c);
+  if((T.ph==='lobby'||T.ph==='end')&&c.m&&!c.ended&&(c.ids.includes(dev)||T.gt)&&c.m.id!==T.mid)enterPlay(c);
   if(T.ph==='lobby')lobby(c);
   if(T.ph==='play'){
-    if(c.ended){endCard(c);return}
+    const gfin=T.gt&&c.ids.some(k=>num((c.pp[k]||{}).f,0,99999,0)>0);
+    if(c.ended||(gfin&&now-T.gfin>900)){endCard(c);return}
+    /* Tim gantian: tim yang giliran berganti tiap ronde (tim tersingkir dilewati) */
+    if(T.gt&&c.el>=0&&!gfin){const want=gtTurn(c);if(want!==T.cur){swapT();E.he.textContent=hh();snd(660,.08,'triangle');if(T.pr)showPair(c);me()}}
     if(c.rd!==T.rd){T.rd=c.rd;T.rv=0;T.pr=c.rd>=0?pairAt(c.m.seed||'x',c.rd):null;showPair(c);
       if(c.rd>=0){snd(520,.08,'triangle');const w=performance.now();if(w-(T.ls||0)>1500){T.ls=w;try{say(T.pr.a)}catch(e){}}}
       else{flash(String(Math.max(1,Math.ceil(-c.el))),0)}}
@@ -302,20 +350,22 @@ function tick(now,dt){
     if(T.pr&&!T.rv&&c.rt>=SHOW){T.rv=T.pr.ok?1:-1;showPair(c);snd(T.pr.ok?880:200,.2,T.pr.ok?'triangle':'square');if(T.pr.ok)T.cheer=now}
     if(E.ti&&T.pr)E.ti.style.transform='scaleX('+Math.max(0,1-c.rt/SHOW)+')';
     sim(c,dt);
-    if(now-T.zs>300){T.zs=now;me()}
+    if(now-T.zs>(T.gt?50:300)){T.zs=now;me()}
     E.t.textContent='⏱ '+fmt(Math.max(0,Math.ceil(DUR-Math.max(0,c.el))));
     const ds=E.bar.querySelectorAll('.d');c.ids.forEach((k,i)=>{if(ds[i])ds[i].style.left=Math.min(100,(k===dev?L.z:num((c.pp[k]||{}).z,0,9999,0)/10)/LEN*100)+'%'})}}
 function frame(){
   const now=performance.now(),dt=Math.min(.05,Math.max(0,(now-T.tp)/1000)),t=now/1000;T.tp=now;
   tick(now,dt);const c=T.c,ids=c.ids.length?c.ids:[dev],n=ids.length;
-  const lx=(Math.max(0,ids.indexOf(dev))-(n-1)/2)*LW;
-  /* pemain lokal */
-  const mv=Math.min(1,L.v/SP),sw=Math.sin(t*15)*mv*.9;let py=Math.abs(sw)*.12;
-  P.rotation.order='XYZ';P.rotation.set(0,Math.PI,0);P.armL.rotation.set(-sw,0,0);P.armR.rotation.set(sw,0,0);P.legL.rotation.x=sw;P.legR.rotation.x=-sw;
-  if(L.st>0){P.rotation.set(0,Math.PI,Math.sin(t*26)*.45*Math.max(0,L.st/STUN));P.armL.rotation.x=P.armR.rotation.x=-1.2+Math.sin(t*30)*.5}
-  else if(L.f){P.armL.rotation.x=P.armR.rotation.x=-2.8;py=Math.abs(Math.sin(t*5))*.9}
-  else if(L.h<=0)P.rotation.set(0,Math.PI,1.3);
-  const wz=AZ-L.z;P.position.set(lx,pl.y+py,wz);pl.x=lx;pl.z=wz;
+  const lx=T.gt?0:(Math.max(0,ids.indexOf(dev))-(n-1)/2)*LW;
+  const wz=AZ-(T.gt?(gS(0).z+gS(1).z)/2:L.z);
+  /* pemain lokal (tidak dipakai di mode Tim gantian: dua pelari tim digambar seperti pemain lain) */
+  if(!T.gt){
+    const mv=Math.min(1,L.v/SP),sw=Math.sin(t*15)*mv*.9;let py=Math.abs(sw)*.12;
+    P.rotation.order='XYZ';P.rotation.set(0,Math.PI,0);P.armL.rotation.set(-sw,0,0);P.armR.rotation.set(sw,0,0);P.legL.rotation.x=sw;P.legR.rotation.x=-sw;
+    if(L.st>0){P.rotation.set(0,Math.PI,Math.sin(t*26)*.45*Math.max(0,L.st/STUN));P.armL.rotation.x=P.armR.rotation.x=-1.2+Math.sin(t*30)*.5}
+    else if(L.f){P.armL.rotation.x=P.armR.rotation.x=-2.8;py=Math.abs(Math.sin(t*5))*.9}
+    else if(L.h<=0)P.rotation.set(0,Math.PI,1.3);
+    P.position.set(lx,pl.y+py,wz);pl.x=lx;pl.z=wz}
   /* pemain lain */
   for(let i=0;i<MAXP;i++){const r=T.rn[i],k=ids[i];
     if(!r||!k||k===dev||T.ph!=='play'){if(r)r.g.visible=false;continue}
