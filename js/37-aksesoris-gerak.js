@@ -39,7 +39,7 @@ function flyUpd(dt,t){
  if(open||CV)return;if(INTR.on||RID){stopFly();return}
  const c=FC[FL.id]||FC.jetpack;FL.thr=held()&&!FL.wait&&FL.fuel>0?1:0;
  if(FL.thr)FL.fuel=Math.max(0,FL.fuel-c.dr*dt);else if(pl.y<=.05&&!FL.wait)FL.fuel=Math.min(100,FL.fuel+10*dt);
- if(FL.wait)pl.vy=0;else{const vt=FL.thr?c.up:c.dn;if(!(FL.thr&&pl.y>=c.max))pl.vy+=(vt-pl.vy)*Math.min(1,dt*(FL.thr?3.5:2.5));if(pl.y>=c.max&&pl.vy>0)pl.vy=0}
+ if(FL.wait)pl.vy=0;else{pl.vy+=42*dt;const vt=FL.thr?c.up:c.dn;if(!(FL.thr&&pl.y>=c.max))pl.vy+=(vt-pl.vy)*Math.min(1,dt*(FL.thr?3.5:2.5));if(pl.y>=c.max&&pl.vy>0)pl.vy=0}
  if(pl.y>1.2)FL.air=1;if(FL.air&&pl.y<=.02){stopFly();ts('🛬 Mendarat dengan selamat!',1400);return}
  const m=FL.wait?null:inp();if(m)push(m,12*c.boost*(key.shift?1.4:1)*dt);
  wallsOff(pl.y>26);
